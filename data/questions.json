@@ -1,0 +1,1993 @@
+[
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "مصر",
+    "difficulty": "easy",
+    "flagImage": "https://flagcdn.com/w640/eg.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "السعودية",
+    "difficulty": "easy",
+    "flagImage": "https://flagcdn.com/w640/sa.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "المغرب",
+    "difficulty": "easy",
+    "flagImage": "https://flagcdn.com/w640/ma.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "الإمارات",
+    "difficulty": "easy",
+    "flagImage": "https://flagcdn.com/w640/ae.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "فلسطين",
+    "difficulty": "easy",
+    "flagImage": "https://flagcdn.com/w640/ps.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "الأردن",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/jo.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "لبنان",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/lb.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "تونس",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/tn.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "الجزائر",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/dz.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "الكويت",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/kw.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "البحرين",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/bh.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "قطر",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/qa.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "سلطنة عمان",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/om.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "العراق",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/iq.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "سوريا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/sy.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "السودان",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/sd.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "ليبيا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/ly.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "موريتانيا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/mr.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "اليمن",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/ye.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "الصومال",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/so.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "فرنسا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/fr.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "إيطاليا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/it.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "إسبانيا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/es.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "ألمانيا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/de.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "إنجلترا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/gb.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "البرازيل",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/br.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "الأرجنتين",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/ar.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "اليابان",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/jp.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "الصين",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/cn.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "أمريكا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/us.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "كندا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/ca.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "روسيا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/ru.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "تركيا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/tr.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "المكسيك",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/mx.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "البرتغال",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/pt.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "هولندا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/nl.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "بلجيكا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/be.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "السويد",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/se.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "سويسرا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/ch.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "الهند",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/in.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "كوريا الجنوبية",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/kr.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "أستراليا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/au.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "كوراساو",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/cw.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "المالديف",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/mv.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "سنغافورة",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/sg.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "آيسلندا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/is.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "جامايكا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/jm.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "مدغشقر",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/mg.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "موناكو",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/mc.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "البهاما",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/bs.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "نيبال",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/np.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "سريلانكا",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/lk.png"
+  },
+  {
+    "text": "ما هي الدولة صاحبة هذا العلم؟",
+    "category": "flags",
+    "answer": "الرأس الأخضر",
+    "difficulty": "medium",
+    "flagImage": "https://flagcdn.com/w640/cv.png"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'حبيبي'",
+    "category": "word-in-song",
+    "answer": "يا نور العين",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'البحر'",
+    "category": "word-in-song",
+    "answer": "يا واد يا تقيل",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'الليل'",
+    "category": "word-in-song",
+    "answer": "آه يا ليل",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'الهوا'",
+    "category": "word-in-song",
+    "answer": "جانا الهوا",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'عيون'",
+    "category": "word-in-song",
+    "answer": "عيونك شايفها",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'حب'",
+    "category": "word-in-song",
+    "answer": "الحب كله",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'قلبي'",
+    "category": "word-in-song",
+    "answer": "يا طيب القلب",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'روحي'",
+    "category": "word-in-song",
+    "answer": "يا روحي غيبي",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'يا ليل'",
+    "category": "word-in-song",
+    "answer": "يا ليل وعين",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'جميل'",
+    "category": "word-in-song",
+    "answer": "حلو وجميل",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'شوق'",
+    "category": "word-in-song",
+    "answer": "علمني الشوق",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'دنيا'",
+    "category": "word-in-song",
+    "answer": "الدنيا حلوة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'قمر'",
+    "category": "word-in-song",
+    "answer": "يا واد يا قمر",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'نور'",
+    "category": "word-in-song",
+    "answer": "يا نور عيني",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'سهر'",
+    "category": "word-in-song",
+    "answer": "سهر الليالي",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'غالي'",
+    "category": "word-in-song",
+    "answer": "يا غالي عليا",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'وداع'",
+    "category": "word-in-song",
+    "answer": "ساعة الوداع",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'سفر'",
+    "category": "word-in-song",
+    "answer": "مكتوب عليا السفر",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'غربة'",
+    "category": "word-in-song",
+    "answer": "يا غربة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'فراق'",
+    "category": "word-in-song",
+    "answer": "فراق بفراق",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'كلام'",
+    "category": "word-in-song",
+    "answer": "كلام الناس",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'حلم'",
+    "category": "word-in-song",
+    "answer": "حلم جميل",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'طريق'",
+    "category": "word-in-song",
+    "answer": "طريقنا طويل",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'عمر'",
+    "category": "word-in-song",
+    "answer": "العمر مشوار",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'زمن'",
+    "category": "word-in-song",
+    "answer": "يا زمن",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'ضحكة'",
+    "category": "word-in-song",
+    "answer": "ضحكتها علامة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'دموع'",
+    "category": "word-in-song",
+    "answer": "دموعي تنزل",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'جرح'",
+    "category": "word-in-song",
+    "answer": "جرح تاني",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'صبر'",
+    "category": "word-in-song",
+    "answer": "الصبر طيب",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'ورد'",
+    "category": "word-in-song",
+    "answer": "يا ورد مين يشتريك",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'شمس'",
+    "category": "word-in-song",
+    "answer": "شمس الشموسة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'سما'",
+    "category": "word-in-song",
+    "answer": "السما زرقا",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'مطر'",
+    "category": "word-in-song",
+    "answer": "مطر مطر",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'بلد'",
+    "category": "word-in-song",
+    "answer": "يا بلدنا",
+    "difficulty": "easy"
+  },
+  {
+    "text": "قول/غني مقطع من أغنية فيها كلمة: 'صاحب'",
+    "category": "word-in-song",
+    "answer": "يا صاحبي",
+    "difficulty": "easy"
+  },
+  {
+    "text": "حاجة ليها سنان كتير بس مش بتعض؟",
+    "category": "describe-it",
+    "answer": "المشط",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتشتريها خضرا، وتكون حمرا في السوق، وتبقى سودا لما تستخدمها في البيت؟",
+    "category": "describe-it",
+    "answer": "الشاي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتشتريها عشان تكسرها قبل ما تستخدمها؟",
+    "category": "describe-it",
+    "answer": "البيض",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتمشي وتوقف بس ملهاش رجلين؟",
+    "category": "describe-it",
+    "answer": "الساعة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتطير بس ملهاش جناحين وممكن تبكي بدون عينين؟",
+    "category": "describe-it",
+    "answer": "السحاب",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة كل ما تاخد منها تكبر وكل ما تضيف ليها تصغر؟",
+    "category": "describe-it",
+    "answer": "الحفرة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتمشي وراك طول النهار ومتقدرش تلمسها؟",
+    "category": "describe-it",
+    "answer": "الضل",
+    "difficulty": "medium"
+  },
+  {
+    "text": "بيت ملوش أبواب ولا شبابيك؟",
+    "category": "describe-it",
+    "answer": "البيض",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتتكلم كل لغات العالم وملهاش لسان؟",
+    "category": "describe-it",
+    "answer": "صدى الصوت",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتعدي المايه ومبتتبلش؟",
+    "category": "describe-it",
+    "answer": "الضوء",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتكبر لما نضربها؟",
+    "category": "describe-it",
+    "answer": "الأعداد",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة ليها عين واحدة بس مبتشوفش؟",
+    "category": "describe-it",
+    "answer": "الإبرة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتدخل المايه ناشفة وتطلع مبلولة؟",
+    "category": "describe-it",
+    "answer": "الاسفنج",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتكتب ومبتعرفش تقرأ؟",
+    "category": "describe-it",
+    "answer": "القلم",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة كل ما تغليها تجمد؟",
+    "category": "describe-it",
+    "answer": "البيض",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتسمع بلا أذن وتتكلم بلا لسان؟",
+    "category": "describe-it",
+    "answer": "التلفون",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة إذا لمستها بتصرخ؟",
+    "category": "describe-it",
+    "answer": "الجرس",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتولد في النار وإذا رجعت ليها بتموت؟",
+    "category": "describe-it",
+    "answer": "الفحم",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بنرميها بعد ما نطبخها وناكل اللي جواها؟",
+    "category": "describe-it",
+    "answer": "البيض",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتنقص كل ما زادت؟",
+    "category": "describe-it",
+    "answer": "العمر",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتنضف لما تسود؟",
+    "category": "describe-it",
+    "answer": "السبورة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتطلع الجبل من غير رجلين؟",
+    "category": "describe-it",
+    "answer": "الدخان",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتاكل ومتشبعش وإذا شربت تموت؟",
+    "category": "describe-it",
+    "answer": "النار",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة ليها رجلين ومبتمشيش؟",
+    "category": "describe-it",
+    "answer": "البنطلون",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بترميه لما تحتاجها؟",
+    "category": "describe-it",
+    "answer": "هلب السفينة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة موجودة في وسط باريس؟",
+    "category": "describe-it",
+    "answer": "حرف الراء",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة موجودة في القرن مرة وفي الدقيقة مرتين وموجودة في الساعة؟",
+    "category": "describe-it",
+    "answer": "حرف القاف",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ابن مامتك وباباك وميبقاش أخوك ولا أختك؟",
+    "category": "describe-it",
+    "answer": "أنت",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة مليانة ثقوب ومع ذلك بتحفظ المايه جواها؟",
+    "category": "describe-it",
+    "answer": "الاسفنج",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتتحرك حواليك بس متشوفهاش؟",
+    "category": "describe-it",
+    "answer": "الهواء",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتشوف كل شيء ومعندهاش عيون؟",
+    "category": "describe-it",
+    "answer": "المراية",
+    "difficulty": "medium"
+  },
+  {
+    "text": "شجرة ملهاش ظل ولا ثمار؟",
+    "category": "describe-it",
+    "answer": "شجرة العائلة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتجري ومبتتعبش؟",
+    "category": "describe-it",
+    "answer": "الماء",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بنمشي عليها ومبنقدرش نعديها؟",
+    "category": "describe-it",
+    "answer": "السقف",
+    "difficulty": "medium"
+  },
+  {
+    "text": "حاجة بتصنعها بس متقدرش تشوفها؟",
+    "category": "describe-it",
+    "answer": "الصوت",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو الكوكب الأكثر سخونة في المجموعة الشمسية؟",
+    "category": "general-knowledge",
+    "answer": "الزهرة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي أصغر دولة في العالم؟",
+    "category": "general-knowledge",
+    "answer": "الفاتيكان",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو العضو الوحيد في جسم الإنسان الذي يمكنه إعادة النمو بعد استئصال جزء منه؟",
+    "category": "general-knowledge",
+    "answer": "الكبد",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي الدولة الأفريقية الوحيدة التي لم تُستعمر قط؟",
+    "category": "general-knowledge",
+    "answer": "إثيوبيا",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو البحر الأكثر ملوحة في العالم؟",
+    "category": "general-knowledge",
+    "answer": "البحر الميت",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو الغاز الأكثر وفرة في الغلاف الجوي للأرض؟",
+    "category": "general-knowledge",
+    "answer": "النيتروجين",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي عاصمة أستراليا؟",
+    "category": "general-knowledge",
+    "answer": "كانبرا",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو أطول نهر في العالم؟",
+    "category": "general-knowledge",
+    "answer": "نهر النيل",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي عاصمة اليابان؟",
+    "category": "general-knowledge",
+    "answer": "طوكيو",
+    "difficulty": "medium"
+  },
+  {
+    "text": "كم عدد كواكب المجموعة الشمسية؟",
+    "category": "general-knowledge",
+    "answer": "8",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي أكبر صحراء في العالم؟",
+    "category": "general-knowledge",
+    "answer": "الصحراء الكبرى",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو أسرع حيوان بري في العالم؟",
+    "category": "general-knowledge",
+    "answer": "الفهد",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو الحيوان الذي يُلقب بملك الغابة؟",
+    "category": "general-knowledge",
+    "answer": "الأسد",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو المحيط الأكبر في العالم؟",
+    "category": "general-knowledge",
+    "answer": "المحيط الهادئ",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي أكبر جزيرة في العالم؟",
+    "category": "general-knowledge",
+    "answer": "جرينلاند",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو أصغر محيط في العالم؟",
+    "category": "general-knowledge",
+    "answer": "المحيط المتجمد الشمالي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "في أي قارة تقع صحراء غوبي؟",
+    "category": "general-knowledge",
+    "answer": "آسيا",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو المعدن الذي يوجد في الحالة السائلة في درجة حرارة الغرفة؟",
+    "category": "general-knowledge",
+    "answer": "الزئبق",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو الفيتامين الذي يتم تصنيعه في الجلد عند التعرض لأشعة الشمس؟",
+    "category": "general-knowledge",
+    "answer": "فيتامين د",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو العنصر الكيميائي الذي يمثله الرمز Fe؟",
+    "category": "general-knowledge",
+    "answer": "الحديد",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو أكبر بلد في العالم من حيث المساحة؟",
+    "category": "general-knowledge",
+    "answer": "روسيا",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي عاصمة فرنسا؟",
+    "category": "general-knowledge",
+    "answer": "باريس",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو أثقل حيوان في العالم؟",
+    "category": "general-knowledge",
+    "answer": "الحوت الأزرق",
+    "difficulty": "medium"
+  },
+  {
+    "text": "كم عدد صمامات قلب الإنسان؟",
+    "category": "general-knowledge",
+    "answer": "4",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي عملة دولة اليابان؟",
+    "category": "general-knowledge",
+    "answer": "الين",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي عاصمة إيطاليا؟",
+    "category": "general-knowledge",
+    "answer": "روما",
+    "difficulty": "medium"
+  },
+  {
+    "text": "كم عدد أسنان الشخص البالغ؟",
+    "category": "general-knowledge",
+    "answer": "32",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي عاصمة روسيا؟",
+    "category": "general-knowledge",
+    "answer": "موسكو",
+    "difficulty": "medium"
+  },
+  {
+    "text": "من هو مكتشف الجاذبية الأرضية؟",
+    "category": "general-knowledge",
+    "answer": "إسحاق نيوتن",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو الاسم العلمي للماء؟",
+    "category": "general-knowledge",
+    "answer": "H2O",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو الكوكب الأقرب إلى الشمس؟",
+    "category": "general-knowledge",
+    "answer": "عطارد",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي الدولة التي تسمى أرض الشمس المشرقة؟",
+    "category": "general-knowledge",
+    "answer": "اليابان",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي أصغر قارة في العالم؟",
+    "category": "general-knowledge",
+    "answer": "أستراليا",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو الطائر الذي لا يطير ولديه أجنحة ويسبح في الماء؟",
+    "category": "general-knowledge",
+    "answer": "البطريق",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو أطول جبل في العالم؟",
+    "category": "general-knowledge",
+    "answer": "إفرست",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي عاصمة إسبانيا؟",
+    "category": "general-knowledge",
+    "answer": "مدريد",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو العضو المسؤول عن تصفية الدم في جسم الإنسان؟",
+    "category": "general-knowledge",
+    "answer": "الكلية",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي الدولة الأكثر سكاناً في العالم حالياً؟",
+    "category": "general-knowledge",
+    "answer": "الهند",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي عاصمة إنجلترا؟",
+    "category": "general-knowledge",
+    "answer": "لندن",
+    "difficulty": "medium"
+  },
+  {
+    "text": "كم عدد خطوط الطول على الكرة الأرضية؟",
+    "category": "general-knowledge",
+    "answer": "360",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو الطائر الذي يضع أكبر بيضة في العالم؟",
+    "category": "general-knowledge",
+    "answer": "النعامة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو الغاز الذي يستخدم لإطفاء الحرائق؟",
+    "category": "general-knowledge",
+    "answer": "ثاني أكسيد الكربون",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي أكبر خلية في جسم الإنسان؟",
+    "category": "general-knowledge",
+    "answer": "البويضة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "كم عدد ألوان قوس قزح؟",
+    "category": "general-knowledge",
+    "answer": "7",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي لغة البرازيل الرسمية؟",
+    "category": "general-knowledge",
+    "answer": "البرتغالية",
+    "difficulty": "medium"
+  },
+  {
+    "text": "كم عدد فقرات عنق الزرافة؟",
+    "category": "general-knowledge",
+    "answer": "7",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هي عاصمة كندا؟",
+    "category": "general-knowledge",
+    "answer": "أوتاوا",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو أقسى عنصر طبيعي معروف على وجه الأرض؟",
+    "category": "general-knowledge",
+    "answer": "الماس",
+    "difficulty": "medium"
+  },
+  {
+    "text": "كم عدد قارات العالم؟",
+    "category": "general-knowledge",
+    "answer": "7",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو الكوكب الأكبر في مجموعتنا الشمسية؟",
+    "category": "general-knowledge",
+    "answer": "المشتري",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'الحريفة' (2024)؟",
+    "category": "egyptian-movies",
+    "answer": "نور النبوي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو الفيلم الوحيد الذي جمع عادل إمام وأحمد زكي؟",
+    "category": "egyptian-movies",
+    "answer": "شياطين الإنس",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطلة فيلم 'إكس مراتي' (2024) مع هشام ماجد ومحمد ممدوح؟",
+    "category": "egyptian-movies",
+    "answer": "أمينة خليل",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو الفيلم الذي جمع كريم عبد العزيز وأحمد حلمي في بداياتهما الفنية عام 1999؟",
+    "category": "egyptian-movies",
+    "answer": "عبود على الحدود",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'فاصل من اللحظات اللذيذة' (2024) بجانب هنا الزاهد؟",
+    "category": "egyptian-movies",
+    "answer": "هشام ماجد",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطلة مسلسل 'نعمة الأفوكاتو' في رمضان 2024؟",
+    "category": "egyptian-movies",
+    "answer": "مي عمر",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو الفيلم الوحيد اللي مثل فيه محمد هنيدي مع عمرو دياب؟",
+    "category": "egyptian-movies",
+    "answer": "آيس كريم في جليم",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'شماريخ' (2023) مع أمينة خليل؟",
+    "category": "egyptian-movies",
+    "answer": "آسر ياسين",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو أول فيلم لتامر حسني عام 2004؟",
+    "category": "egyptian-movies",
+    "answer": "حالة حب",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'عسل إسود'؟",
+    "category": "egyptian-movies",
+    "answer": "أحمد حلمي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطلة فيلم 'اللمبي'؟",
+    "category": "egyptian-movies",
+    "answer": "عبلة كامل",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو الفيلم المشترك الذي جمع بين كريم عبد العزيز وأحمد عز؟",
+    "category": "egyptian-movies",
+    "answer": "كيرة والجن",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'سهر الليالي'؟",
+    "category": "egyptian-movies",
+    "answer": "شريف منير",
+    "difficulty": "medium"
+  },
+  {
+    "text": "ما هو أول فيلم كوميدي طويل للفنان محمد سعد كبطل مطلق؟",
+    "category": "egyptian-movies",
+    "answer": "اللمبي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل مسلسل 'جعفر العمدة' في رمضان 2023؟",
+    "category": "egyptian-movies",
+    "answer": "محمد رمضان",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل مسلسل 'الحشاشين' في رمضان 2024؟",
+    "category": "egyptian-movies",
+    "answer": "كريم عبد العزيز",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطلة مسلسل 'تحت الوصاية' في رمضان 2023؟",
+    "category": "egyptian-movies",
+    "answer": "منى زكي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "بطل فيلم 'تيتو' بجانب أحمد الفيشاوي وخالد صالح؟",
+    "category": "egyptian-movies",
+    "answer": "أحمد السقا",
+    "difficulty": "medium"
+  },
+  {
+    "text": "بطل فيلم 'صعيدي في الجامعة الأمريكية'؟",
+    "category": "egyptian-movies",
+    "answer": "محمد هنيدي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "بطلة فيلم 'صعيدي في الجامعة الأمريكية' بجانب هنيدي؟",
+    "category": "egyptian-movies",
+    "answer": "منى زكي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'الناظر'؟",
+    "category": "egyptian-movies",
+    "answer": "علاء ولي الدين",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'ابن عز'؟",
+    "category": "egyptian-movies",
+    "answer": "علاء ولي الدين",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'أبو علي'؟",
+    "category": "egyptian-movies",
+    "answer": "كريم عبد العزيز",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطلة فيلم 'أبو علي' بجانب كريم عبد العزيز؟",
+    "category": "egyptian-movies",
+    "answer": "منى زكي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'حرب أطاليا'؟",
+    "category": "egyptian-movies",
+    "answer": "أحمد السقا",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'إكس لارج'؟",
+    "category": "egyptian-movies",
+    "answer": "أحمد حلمي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطلة فيلم 'إكس لارج' بجانب أحمد حلمي؟",
+    "category": "egyptian-movies",
+    "answer": "دنيا سمير غانم",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'جاءنا البيان التالي'؟",
+    "category": "egyptian-movies",
+    "answer": "محمد هنيدي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'فول الصين العظيم'؟",
+    "category": "egyptian-movies",
+    "answer": "محمد هنيدي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'الباشا تلميذ'؟",
+    "category": "egyptian-movies",
+    "answer": "كريم عبد العزيز",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'واحد من الناس'؟",
+    "category": "egyptian-movies",
+    "answer": "كريم عبد العزيز",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'الجزيرة'؟",
+    "category": "egyptian-movies",
+    "answer": "أحمد السقا",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطلة فيلم 'الجزيرة' بجانب أحمد السقا؟",
+    "category": "egyptian-movies",
+    "answer": "هند صبري",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'كده رضا'؟",
+    "category": "egyptian-movies",
+    "answer": "أحمد حلمي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'آسف على الإزعاج'؟",
+    "category": "egyptian-movies",
+    "answer": "أحمد حلمي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'ملاكي إسكندرية'؟",
+    "category": "egyptian-movies",
+    "answer": "أحمد عز",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'الرهينة'؟",
+    "category": "egyptian-movies",
+    "answer": "أحمد عز",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'ولاد رزق' الأول عام 2015؟",
+    "category": "egyptian-movies",
+    "answer": "أحمد عز",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'الفيل الأزرق'؟",
+    "category": "egyptian-movies",
+    "answer": "كريم عبد العزيز",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'أمير الظلام'؟",
+    "category": "egyptian-movies",
+    "answer": "عادل إمام",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'السفارة في العمارة'؟",
+    "category": "egyptian-movies",
+    "answer": "عادل إمام",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'مرجان أحمد مرجان'؟",
+    "category": "egyptian-movies",
+    "answer": "عادل إمام",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'طباخ الريس'؟",
+    "category": "egyptian-movies",
+    "answer": "طلعت زكريا",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'حبيبي نائماً' مع مي عز الدين؟",
+    "category": "egyptian-movies",
+    "answer": "خالد أبو النجا",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'عمر وسلمى' بجانب مي عز الدين؟",
+    "category": "egyptian-movies",
+    "answer": "تامر حسني",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'حرب كرموز'؟",
+    "category": "egyptian-movies",
+    "answer": "أمير كرارة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل مسلسل 'كلبش'؟",
+    "category": "egyptian-movies",
+    "answer": "أمير كرارة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'مستر إكس' (2023)؟",
+    "category": "egyptian-movies",
+    "answer": "أحمد فهمي",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'بيت الروبي' (2023) بجانب كريم عبد العزيز؟",
+    "category": "egyptian-movies",
+    "answer": "كريم محمود عبد العزيز",
+    "difficulty": "medium"
+  },
+  {
+    "text": "مين بطل فيلم 'البدلة' مع أكرم حسني؟",
+    "category": "egyptian-movies",
+    "answer": "تامر حسني",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ر - ت - و - ي - ب - م - ك",
+    "category": "reversed-words",
+    "answer": "كمبيوتر",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ن - و - ي - ز - ف - ل - ت",
+    "category": "reversed-words",
+    "answer": "تلفزيون",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ر - و - ص - ا - ن - ي - د",
+    "category": "reversed-words",
+    "answer": "ديناصور",
+    "difficulty": "hard"
+  },
+  {
+    "text": "الكلمة المعكوسة: س - د - ن - ه - م",
+    "category": "reversed-words",
+    "answer": "مهندس",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ل - ي - ا - ب - و - م",
+    "category": "reversed-words",
+    "answer": "موبايل",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ر - ا - ي - ط",
+    "category": "reversed-words",
+    "answer": "طيارة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ح - ا - ف - ت",
+    "category": "reversed-words",
+    "answer": "تفاحة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: س - ي - ب - و - ت - أ",
+    "category": "reversed-words",
+    "answer": "أتوبيس",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ى - ف - ش - ت - س - م",
+    "category": "reversed-words",
+    "answer": "مستشفى",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ع - م - ا - ج",
+    "category": "reversed-words",
+    "answer": "جامعة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - س - ر - د - م",
+    "category": "reversed-words",
+    "answer": "مدرسة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ب - ي - ب - ط",
+    "category": "reversed-words",
+    "answer": "طبيب",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ذ - ا - ت - س - أ",
+    "category": "reversed-words",
+    "answer": "أستاذ",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ب - ا - ت - ك",
+    "category": "reversed-words",
+    "answer": "كتاب",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ر - ا - ظ - ن",
+    "category": "reversed-words",
+    "answer": "نظارة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ع - ا - س",
+    "category": "reversed-words",
+    "answer": "ساعة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ح - ا - ت - ف - م",
+    "category": "reversed-words",
+    "answer": "مفتاح",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ك - ا - ب - ش",
+    "category": "reversed-words",
+    "answer": "شباك",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ل - و - ا - ط",
+    "category": "reversed-words",
+    "answer": "طاولة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: خ - ب - ط - م",
+    "category": "reversed-words",
+    "answer": "مطبخ",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ق - ي - د - ح",
+    "category": "reversed-words",
+    "answer": "حديقة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ع - ر - ا - ش",
+    "category": "reversed-words",
+    "answer": "شارع",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ن - ي - د - م",
+    "category": "reversed-words",
+    "answer": "مدينة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ر - ي - ز - ج",
+    "category": "reversed-words",
+    "answer": "جزيرة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ط - ي - ح - م",
+    "category": "reversed-words",
+    "answer": "محيط",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ن - ي - ف - س",
+    "category": "reversed-words",
+    "answer": "سفينة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ج - ا - ر - د",
+    "category": "reversed-words",
+    "answer": "دراجة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ر - ا - ي - س",
+    "category": "reversed-words",
+    "answer": "سيارة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ن - و - ف - ل - ت",
+    "category": "reversed-words",
+    "answer": "تلفون",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ف - ي - ي - ك - ت",
+    "category": "reversed-words",
+    "answer": "تكييف",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ج - ا - ل - ث",
+    "category": "reversed-words",
+    "answer": "ثلاجة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ل - ا - س - غ",
+    "category": "reversed-words",
+    "answer": "غسالة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ز - ا - ج - ا - ت - و - ب",
+    "category": "reversed-words",
+    "answer": "بوتاجاز",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ح - و - ر - م",
+    "category": "reversed-words",
+    "answer": "مروحة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ن - ح - ا - ش",
+    "category": "reversed-words",
+    "answer": "شاحن",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ع - ا - م - س",
+    "category": "reversed-words",
+    "answer": "سماعة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ا - ر - ي - م - ا - ك",
+    "category": "reversed-words",
+    "answer": "كاميرا",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ش - ا - ش",
+    "category": "reversed-words",
+    "answer": "شاشة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ء - ا - ب - ر - ه - ك",
+    "category": "reversed-words",
+    "answer": "كهرباء",
+    "difficulty": "hard"
+  },
+  {
+    "text": "الكلمة المعكوسة: س - ي - ط - ا - ن - غ - م",
+    "category": "reversed-words",
+    "answer": "مغناطيس",
+    "difficulty": "hard"
+  },
+  {
+    "text": "الكلمة المعكوسة: ب - و - ك - س - ل - ت",
+    "category": "reversed-words",
+    "answer": "تلسكوب",
+    "difficulty": "hard"
+  },
+  {
+    "text": "الكلمة المعكوسة: ب - و - ك - س - و - ر - ك - ي - م",
+    "category": "reversed-words",
+    "answer": "ميكروسكوب",
+    "difficulty": "hard"
+  },
+  {
+    "text": "الكلمة المعكوسة: خ - و - ر - ا - ص",
+    "category": "reversed-words",
+    "answer": "صاروخ",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ب - ك - و - ك",
+    "category": "reversed-words",
+    "answer": "كوكب",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ر - ج - م",
+    "category": "reversed-words",
+    "answer": "مجرة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ء - ا - ض - ف - د - ئ - ا - ر",
+    "category": "reversed-words",
+    "answer": "رائد فضاء",
+    "difficulty": "hard"
+  },
+  {
+    "text": "الكلمة المعكوسة: خ - ي - ر - ا - ت",
+    "category": "reversed-words",
+    "answer": "تاريخ",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ا - ي - ف - ا - ر - غ - ج",
+    "category": "reversed-words",
+    "answer": "جغرافيا",
+    "difficulty": "hard"
+  },
+  {
+    "text": "الكلمة المعكوسة: ت - ا - ي - ض - ا - ي - ر",
+    "category": "reversed-words",
+    "answer": "رياضيات",
+    "difficulty": "hard"
+  },
+  {
+    "text": "الكلمة المعكوسة: ء - ا - ي - ز - ي - ف",
+    "category": "reversed-words",
+    "answer": "فيزياء",
+    "difficulty": "hard"
+  },
+  {
+    "text": "الكلمة المعكوسة: ء - ا - ي - م - ي - ك",
+    "category": "reversed-words",
+    "answer": "كيمياء",
+    "difficulty": "hard"
+  },
+  {
+    "text": "الكلمة المعكوسة: ء - ا - ي - ح - أ",
+    "category": "reversed-words",
+    "answer": "أحياء",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ف - س - ل - ف",
+    "category": "reversed-words",
+    "answer": "فلسفة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ى - ق - ي - س - و - م",
+    "category": "reversed-words",
+    "answer": "موسيقى",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ي - ا - و - ر",
+    "category": "reversed-words",
+    "answer": "رواية",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - د - ي - ص - ق",
+    "category": "reversed-words",
+    "answer": "قصيدة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ي - ح - ر - س - م",
+    "category": "reversed-words",
+    "answer": "مسرحية",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ا - م - ن - ي - س",
+    "category": "reversed-words",
+    "answer": "سينما",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ف - ح - ت - م",
+    "category": "reversed-words",
+    "answer": "متحف",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ض - ر - ع - م",
+    "category": "reversed-words",
+    "answer": "معرض",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ب - ت - ك - م",
+    "category": "reversed-words",
+    "answer": "مكتبة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - م - و - ك - ح",
+    "category": "reversed-words",
+    "answer": "حكومة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: س - ي - ئ - ر",
+    "category": "reversed-words",
+    "answer": "رئيس",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ر - ي - ز - و",
+    "category": "reversed-words",
+    "answer": "وزير",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ر - ي - ف - س",
+    "category": "reversed-words",
+    "answer": "سفير",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ن - و - ن - ا - ق",
+    "category": "reversed-words",
+    "answer": "قانون",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - م - ك - ح - م",
+    "category": "reversed-words",
+    "answer": "محكمة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ي - ض - ا - ق",
+    "category": "reversed-words",
+    "answer": "قاضي",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ي - م - ا - ح - م",
+    "category": "reversed-words",
+    "answer": "محامي",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ط - ر - ش",
+    "category": "reversed-words",
+    "answer": "شرطة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ش - ي - ج",
+    "category": "reversed-words",
+    "answer": "جيش",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: د - و - ن - ج",
+    "category": "reversed-words",
+    "answer": "جنود",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ك - ر - ع - م",
+    "category": "reversed-words",
+    "answer": "معركة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ر - ا - ص - ت - ن - ا",
+    "category": "reversed-words",
+    "answer": "انتصار",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ي - ر - ح",
+    "category": "reversed-words",
+    "answer": "حرية",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: م - ا - ل - س",
+    "category": "reversed-words",
+    "answer": "سلام",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ن - ط - و",
+    "category": "reversed-words",
+    "answer": "وطن",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ب - ع - ش",
+    "category": "reversed-words",
+    "answer": "شعب",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ر - ا - ض - ح",
+    "category": "reversed-words",
+    "answer": "حضارة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ر - ا - ث - آ",
+    "category": "reversed-words",
+    "answer": "آثار",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ء - ا - ي - م - و - م",
+    "category": "reversed-words",
+    "answer": "مومياء",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ن - و - ع - ر - ف",
+    "category": "reversed-words",
+    "answer": "فرعون",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ت - ا - م - ا - ر - ه - أ",
+    "category": "reversed-words",
+    "answer": "أهرامات",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ل - ا - ث - م - ت",
+    "category": "reversed-words",
+    "answer": "تمثال",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ع - ل - ق",
+    "category": "reversed-words",
+    "answer": "قلعة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ج - ر - ب",
+    "category": "reversed-words",
+    "answer": "برج",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ب - ا - ح - س - ة - ح - ط - ا - ن",
+    "category": "reversed-words",
+    "answer": "ناطحة سحاب",
+    "difficulty": "hard"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ع - ي - ر - س - ق - ي - ر - ط",
+    "category": "reversed-words",
+    "answer": "طريق سريعة",
+    "difficulty": "hard"
+  },
+  {
+    "text": "الكلمة المعكوسة: ر - ا - ط - م",
+    "category": "reversed-words",
+    "answer": "مطار",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ط - ح - م",
+    "category": "reversed-words",
+    "answer": "محطة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ر - ك - ذ - ت",
+    "category": "reversed-words",
+    "answer": "تذكرة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ب - ي - ق - ح",
+    "category": "reversed-words",
+    "answer": "حقيبة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ق - د - ن - ف",
+    "category": "reversed-words",
+    "answer": "فندق",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ح - ا - ي - س",
+    "category": "reversed-words",
+    "answer": "سياحة",
+    "difficulty": "medium"
+  },
+  {
+    "text": "الكلمة المعكوسة: ئ - ط - ا - ش",
+    "category": "reversed-words",
+    "answer": "شاطئ",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ل - ا - م - ر",
+    "category": "reversed-words",
+    "answer": "رمال",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ج - ا - و - م - أ",
+    "category": "reversed-words",
+    "answer": "أمواج",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ة - ب - ا - غ",
+    "category": "reversed-words",
+    "answer": "غابة",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ر - ا - ج - ش - أ",
+    "category": "reversed-words",
+    "answer": "أشجار",
+    "difficulty": "easy"
+  },
+  {
+    "text": "الكلمة المعكوسة: ر - و - ه - ز",
+    "category": "reversed-words",
+    "answer": "زهور",
+    "difficulty": "easy"
+  }
+]
