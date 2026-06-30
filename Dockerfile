@@ -1,23 +1,18 @@
 FROM node:20
 
-# Create a non-root user to avoid permission issues on HuggingFace
-RUN useradd -m -u 1000 user
-USER user
-ENV HOME=/home/user \
-    PATH=/home/user/.local/bin:$PATH
-
 WORKDIR /app
 
-# Copy package.json and package-lock.json with user permissions
-COPY --chown=user package*.json ./
+# The official Node image already has a 'node' user with UID 1000.
+# We will use it directly to avoid permission errors.
+COPY --chown=node:node package*.json ./
 
-# Install packages (excluding devDependencies to make it lightweight)
 RUN npm install --omit=dev
 
-# Copy the rest of the application
-COPY --chown=user . .
+COPY --chown=node:node . .
 
-# Expose the standard Hugging Face port
+# Switch to the pre-existing node user
+USER node
+
 EXPOSE 7860
 ENV PORT=7860
 
