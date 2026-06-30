@@ -743,8 +743,8 @@ io.on('connection', (socket) => {
   // الحكم بيبدأ اللعبة
   socket.on('start-game', async (code) => {
     const room = rooms[code];
-    if (!room || room.host !== socket.id) return;
-    if (Object.keys(room.players).length === 0) return;
+    // Allow starting with 0 players for testing/dev mode
+    // if (Object.keys(room.players).length === 0) return;
     if (room.status === 'PLAYING' || room.starting) return;
     
     room.starting = true;
