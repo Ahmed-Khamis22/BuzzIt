@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - master
-      - main
-  pull_request:
-    branches:
-      - master
-      - main
 
 jobs:
   build:
@@ -30,4 +25,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Add deployment steps here later (e.g., SSH into 51.20.9.183 and run docker-compose up)
+      - name: Deploy to Production Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 51.20.9.183
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # ادخل على مسار المشروع في السيرفر (عدل المسار لو مختلف)
+            cd ~/BuzzIt/buzzit-server
+            
+            # اسحب آخر التحديثات من جيت هاب
+            git pull origin master
+            
+            # ابني الصورة الجديدة
+            docker build -t buzzit-backend .
+            
+            # وقف وامسح الكونتينر القديم لو شغال
+            docker stop buzzit-backend-container || true
+            docker rm buzzit-backend-container || true
+            
+            # شغل الكونتينر الجديد في الخلفية
+            docker run -d --name buzzit-backend-container -p 4000:4000 --env-file .env buzzit-backend
