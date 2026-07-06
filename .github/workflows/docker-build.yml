@@ -21,25 +21,25 @@ jobs:
             set -e
 
             echo "==> Navigating to project directory..."
-            cd ~/BuzzIt/buzzit-server
+            cd ~/BuzzIt
 
             echo "==> Pulling latest code from GitHub..."
             git pull origin master
 
             echo "==> Building new Docker image..."
-            docker build -t buzzit-backend:latest .
+            docker build -t buzzit .
 
             echo "==> Stopping old container (if running)..."
-            docker stop buzzit-backend-container || true
-            docker rm buzzit-backend-container || true
+            docker stop buzzit || true
+            docker rm buzzit || true
 
             echo "==> Starting new container..."
             docker run -d \
-              --name buzzit-backend-container \
+              --name buzzit \
               --restart unless-stopped \
               -p 4000:4000 \
               --env-file .env \
-              buzzit-backend:latest
+              buzzit
 
             echo "==> Cleaning up old Docker images..."
             docker image prune -f

@@ -1,3 +1,4 @@
+
 FROM node:20
 
 WORKDIR /app
@@ -13,7 +14,7 @@ COPY --chown=node:node . .
 # Switch to the pre-existing node user
 USER node
 
-EXPOSE 7860
-ENV PORT=7860
+EXPOSE 4000
+ENV PORT=4000
 
 CMD ["node", "server.js"]
