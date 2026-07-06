@@ -35,6 +35,13 @@ jobs:
             sudo docker stop buzzit || true
             sudo docker rm buzzit || true
 
+            echo "==> Killing any container using port 4000..."
+            CONTAINER_ON_PORT=$(sudo docker ps -q --filter "publish=4000")
+            if [ -n "$CONTAINER_ON_PORT" ]; then
+              sudo docker stop $CONTAINER_ON_PORT
+              sudo docker rm $CONTAINER_ON_PORT
+            fi
+
             echo "==> Starting new container..."
             sudo docker run -d \
               --name buzzit \
