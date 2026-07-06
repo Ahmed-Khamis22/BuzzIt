@@ -43,4 +43,6 @@ userSchema.methods.comparePassword = function (candidate) {
   return bcrypt.compare(candidate, this.password);
 };
 
+userSchema.index({ totalWins: -1 });
+
 module.exports = mongoose.model('User', userSchema);

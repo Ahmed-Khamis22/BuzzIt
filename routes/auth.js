@@ -25,18 +25,19 @@ router.post('/register', async (req, res) => {
     }
 
     const user = await User.create({ username, email, password });
+    const populatedUser = await User.findById(user._id)
+      .select('-password')
+      .populate('inventory')
+      .populate('equippedItems.avatar')
+      .populate('equippedItems.theme')
+      .populate('equippedItems.effect')
+      .populate('equippedItems.border')
+      .populate('equippedItems.cover');
+
     const token = signToken(user._id);
     res.status(201).json({
       token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        bio: user.bio,
-        coins: user.coins,
-        selectedTheme: user.selectedTheme,
-        preferences: user.preferences,
-      },
+      user: populatedUser,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -58,18 +59,19 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'كلمة المرور غير صحيحة، يرجى المحاولة مرة أخرى.' });
     }
 
+    const populatedUser = await User.findById(user._id)
+      .select('-password')
+      .populate('inventory')
+      .populate('equippedItems.avatar')
+      .populate('equippedItems.theme')
+      .populate('equippedItems.effect')
+      .populate('equippedItems.border')
+      .populate('equippedItems.cover');
+
     const token = signToken(user._id);
     res.json({
       token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        bio: user.bio,
-        coins: user.coins,
-        selectedTheme: user.selectedTheme,
-        preferences: user.preferences,
-      },
+      user: populatedUser,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

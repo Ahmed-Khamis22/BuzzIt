@@ -21,6 +21,13 @@ async function seed() {
       imageUrl: 'avatar_farouk',
     },
     {
+      name: 'سيد جيمنج (Gamer)',
+      description: 'أفاتار كارتوني فريش للي بيعشقوا الألعاب والتحدي.',
+      price: 120,
+      type: 'avatar',
+      imageUrl: 'avatar_cartoon_gamer',
+    },
+    {
       name: 'الأسطى حنكش',
       description: 'شنيور في الميكانيكا، ولسانه أطول منه.',
       price: 60,
@@ -42,25 +49,18 @@ async function seed() {
       imageUrl: 'avatar_tut',
     },
     {
-      name: 'قهوة بلدي',
-      description: 'ثيم بألوان القهوة البلدي الأصيلة، ريحة البن هتطلع من الشاشة.',
-      price: 80,
+      name: 'كأس العالم 2026',
+      description: 'ثيم احتفالي بمشاركة مصر في كأس العالم 2026! البتلو برنا وبنوجسم مصر.',
+      price: 150,
       type: 'theme',
-      imageUrl: 'theme_qahwa',
-    },
-    {
-      name: 'نوستالجيا التمانينات',
-      description: 'ثيم بألوان النيون والديسكو، للناس اللي بتحب الروقان.',
-      price: 120,
-      type: 'theme',
-      imageUrl: 'theme_80s',
+      imageUrl: 'theme_world_cup',
     },
     {
       name: 'كلاكس ميكروباص',
       description: 'صوت مزعج بس بيصحي النايمين أول ما تدوس على الزرار.',
       price: 50,
       type: 'effect',
-      soundUrl: 'red-card.mp3', // Map to existing sound for now
+      soundUrl: 'red-card.mp3',
     },
     {
       name: 'نغمة الانتصار',
@@ -75,7 +75,7 @@ async function seed() {
       description: 'إطار مولع نار للأفاتار بتاعك، يبين إنك مش بتهزر.',
       price: 150,
       type: 'border',
-      imageUrl: 'border_fire', // Logic will handle this as a special gradient
+      imageUrl: 'border_fire',
     },
     {
       name: 'إطار نيون',
@@ -92,42 +92,8 @@ async function seed() {
       imageUrl: 'border_diamond',
     },
     // ---- New Items: Covers ----
-    {
-      name: 'مملكة الفانتازيا',
-      description: 'عالم سحري مليان ألوان كارتونية، لمحبي الـ RPG.',
-      price: 200,
-      type: 'cover',
-      imageUrl: 'cover_cartoon_fantasy',
-    },
-    {
-      name: 'سايبربانك نيون',
-      description: 'مدينة مستقبلية وألوان نيون قوية، جو الخيال العلمي.',
-      price: 250,
-      gemPrice: 50,
-      type: 'cover',
-      imageUrl: 'cover_cartoon_cyberpunk',
-    },
-    {
-      name: 'الفضاء العميق',
-      description: 'كواكب ونجوم وسفن فضائية بأسلوب كارتوني.',
-      price: 180,
-      type: 'cover',
-      imageUrl: 'cover_cartoon_space',
-    },
-    {
-      name: 'سباق النيون',
-      description: 'طريق سباق سريع وألوان نيون سريعة لمحبي السرعة.',
-      price: 150,
-      type: 'cover',
-      imageUrl: 'cover_cartoon_racing',
-    },
-    {
-      name: 'أركيد 80s',
-      description: 'أجهزة ألعاب كلاسيكية وألوان ريترو بأسلوب فيكتور.',
-      price: 100,
-      type: 'cover',
-      imageUrl: 'cover_cartoon_arcade',
-    },
+
+
     // ---- New Batch (Mass Expansion) ----
     {
       name: 'عم محمد البواب',
@@ -151,18 +117,53 @@ async function seed() {
       imageUrl: 'avatar_pharaoh',
     },
     {
-      name: 'أهرامات الجيزة',
-      description: 'غلاف للبروفايل فيه الأهرامات العظيمة وقت الغروب. سحر لا يقاوم.',
+      name: 'أهرامات الجيزة (Pyramids)',
+      description: 'غلاف كارتوني رائع للأهرامات وقت الغروب مع خيال جمل.',
       price: 250,
       type: 'cover',
       imageUrl: 'cover_pyramids',
     },
     {
-      name: 'القاهرة سايبربانك',
-      description: 'غلاف لمدينة القاهرة في المستقبل، نيون وتكاتك طايرة.',
+      name: 'القاهرة سايبربانك (Cyberpunk)',
+      description: 'غلاف لمدينة القاهرة كارتوني في المستقبل مع تكاتك طايرة وأنوار نيون.',
       price: 300,
       type: 'cover',
       imageUrl: 'cover_cyberpunk_cairo',
+    },
+    {
+      name: 'شارع المعز (Moez)',
+      description: 'غلاف كارتوني رائع لشارع المعز الأثري والفوانيس المضيئة بالليل.',
+      price: 200,
+      type: 'cover',
+      imageUrl: 'cover_moez',
+    },
+    {
+      name: 'غرفة الألعاب (Gaming Setup)',
+      description: 'غلاف كارتوني رائع لسيت-أب ألعاب متكامل مع إضاءة ليد ونيون.',
+      price: 250,
+      type: 'cover',
+      imageUrl: 'cover_gaming',
+    },
+    {
+      name: 'الخيمة البدوية (Sinai Camp)',
+      description: 'غلاف كارتوني لخيمة بدوية ونار مشتعلة تحت سماء صحراء سيناء المرصعة بالنجوم.',
+      price: 200,
+      type: 'cover',
+      imageUrl: 'cover_bedouin',
+    },
+    {
+      name: 'عروس البحر (Alexandria Coast)',
+      description: 'غلاف كارتوني رائع لكورنيش وبحر إسكندرية بالليل مع قمر منير.',
+      price: 150,
+      type: 'cover',
+      imageUrl: 'cover_alexandria',
+    },
+    {
+      name: 'سحر النيل (Nile River)',
+      description: 'غلاف كارتوني لنهر النيل مع مركب فلوكة والأهرامات البعيدة وقت الغروب.',
+      price: 150,
+      type: 'cover',
+      imageUrl: 'cover_nile',
     },
     {
       name: 'إطار الماتريكس',
@@ -220,12 +221,42 @@ async function seed() {
       type: 'theme',
       imageUrl: 'theme_pharaoh',
     },
+
+    // ---- New Egyptian Themes ----
     {
-      name: 'المدينة الذكية',
-      description: 'ثيم (ألوان التطبيق) ألوان نيون وماجينتا، سايبربانك ستايل.',
-      price: 220,
+      name: 'ليالي رمضان',
+      description: 'ثيم فوانيس وسحر رمضان في حواري القاهرة القديمة. جو مصري أصيل.',
+      price: 130,
       type: 'theme',
-      imageUrl: 'theme_cyberpunk',
+      imageUrl: 'theme_ramadan',
+    },
+    {
+      name: 'الألتراس',
+      description: 'ثيم نار وحماس وجماهير ملاعب مصر. لمحبي الكرة والجنان.',
+      price: 140,
+      type: 'theme',
+      imageUrl: 'theme_ultras',
+    },
+    {
+      name: 'عروس البحر',
+      description: 'ثيم الإسكندرية والبحر المتوسط، روقان وهدوء وملوكية.',
+      price: 130,
+      type: 'theme',
+      imageUrl: 'theme_alexandria',
+    },
+    {
+      name: 'سيناء الساحرة',
+      description: 'ثيم جبال سيناء وسماء المجرة الرهيبة. لمحبي الطبيعة والسفر.',
+      price: 160,
+      type: 'theme',
+      imageUrl: 'theme_sinai',
+    },
+    {
+      name: 'قاهرة الليل',
+      description: 'ثيم القاهرة من فوق بالليل. مدينة مليون نور وصوت.',
+      price: 180,
+      type: 'theme',
+      imageUrl: 'theme_cairo_night',
     },
     // ---- New Legendary Items (Gem-Only) ----
     {
@@ -255,32 +286,15 @@ async function seed() {
       type: 'avatar',
       imageUrl: 'avatar_cyber_ronin',
     },
+
     {
-      name: 'بوابة الفضاء الفرعونية',
-      description: 'غلاف بروفايل يدمج الأهرامات الذهبية العظيمة مع بوابة النجوم الكونية المضيئة.',
-      price: 99999,
-      gemPrice: 120,
-      isGemOnly: true,
-      type: 'cover',
-      imageUrl: 'cover_cosmic_portal',
-    },
-    {
-      name: 'المدينة الطائرة',
-      description: 'مدينة مستقبلية معلقة بين الكواكب البعيدة والسدم الكونية الساحرة.',
-      price: 99999,
-      gemPrice: 120,
-      isGemOnly: true,
-      type: 'cover',
-      imageUrl: 'cover_floating_city',
-    },
-    {
-      name: 'الشبكة الرقمية الأسطورية',
-      description: 'ثيم غامق فاخر جداً مع خطوط نيون مضيئة ومؤثرات بريميوم في كامل التطبيق.',
+      name: 'سحر النيل',
+      description: 'ثيم خاص بسحر نهر النيل وأجواء مصر المحروسة. للي بيحب بلده بجد.',
       price: 99999,
       gemPrice: 90,
       isGemOnly: true,
       type: 'theme',
-      imageUrl: 'theme_cyberpunk',
+      imageUrl: 'theme_nile_egypt',
     },
     {
       name: 'إطار التنين الذهبي الأسطوري',
@@ -300,6 +314,40 @@ async function seed() {
       type: 'border',
       imageUrl: 'border_horizon',
     },
+    // ---- Admin Items ----
+    {
+      name: 'الزعيم (Admin)',
+      description: 'أفاتار حصري لمديري اللعبة فقط.',
+      price: 0,
+      gemPrice: 0,
+      isGemOnly: false,
+      type: 'avatar',
+      imageUrl: 'avatar_admin',
+      isAvailable: true,
+      isAdminOnly: true
+    },
+    {
+      name: 'إطار الإدارة (Admin)',
+      description: 'إطار مخصص لإدارة اللعبة.',
+      price: 0,
+      gemPrice: 0,
+      isGemOnly: false,
+      type: 'border',
+      imageUrl: 'border_admin',
+      isAvailable: true,
+      isAdminOnly: true
+    },
+    {
+      name: 'غلاف الزعيم (Admin)',
+      description: 'غلاف بروفايل حصري لمديري اللعبة مكتوب عليه ADMIN.',
+      price: 0,
+      gemPrice: 0,
+      isGemOnly: false,
+      type: 'cover',
+      imageUrl: 'cover_admin',
+      isAvailable: true,
+      isAdminOnly: true
+    }
   ];
 
   const names = items.map(i => i.name);

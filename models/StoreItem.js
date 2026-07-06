@@ -17,4 +17,6 @@ const storeItemSchema = new mongoose.Schema({
   isAdminOnly: { type: Boolean, default: false },
 });
 
+storeItemSchema.index({ isAvailable: 1, isAdminOnly: 1 });
+
 module.exports = mongoose.model('StoreItem', storeItemSchema);

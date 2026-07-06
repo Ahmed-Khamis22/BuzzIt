@@ -121,12 +121,16 @@ router.post('/equip', auth, async (req, res) => {
     const item = await StoreItem.findById(itemId);
     if (!item) return res.status(404).json({ error: 'Item not found' });
 
-    // Update equipped items based on type
+    // Update equipped items based on type (toggle off if already equipped)
     if (!user.equippedItems) {
       user.equippedItems = {};
     }
     
-    user.equippedItems[item.type] = item._id;
+    if (user.equippedItems[item.type] && user.equippedItems[item.type].equals(item._id)) {
+      user.equippedItems[item.type] = null;
+    } else {
+      user.equippedItems[item.type] = item._id;
+    }
     await user.save();
 
     // Re-fetch populated user to return the full state to frontend
