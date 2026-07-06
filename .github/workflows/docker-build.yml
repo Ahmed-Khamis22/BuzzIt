@@ -1,4 +1,4 @@
-name: Build Backend Docker Image
+name: Deploy BuzzIt Backend to EC2
 
 on:
   push:
@@ -6,44 +6,42 @@ on:
       - master
 
 jobs:
-  build:
+  deploy:
+    name: SSH into EC2, Build & Redeploy
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Build Docker Image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: false # Set to true if you want to push to DockerHub later
-          tags: buzzit-backend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Deploy to Production Server
+      - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 51.20.9.183
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # ادخل على مسار المشروع في السيرفر (عدل المسار لو مختلف)
+            set -e
+
+            echo "==> Navigating to project directory..."
             cd ~/BuzzIt/buzzit-server
-            
-            # اسحب آخر التحديثات من جيت هاب
+
+            echo "==> Pulling latest code from GitHub..."
             git pull origin master
-            
-            # ابني الصورة الجديدة
-            docker build -t buzzit-backend .
-            
-            # وقف وامسح الكونتينر القديم لو شغال
+
+            echo "==> Building new Docker image..."
+            docker build -t buzzit-backend:latest .
+
+            echo "==> Stopping old container (if running)..."
             docker stop buzzit-backend-container || true
             docker rm buzzit-backend-container || true
-            
-            # شغل الكونتينر الجديد في الخلفية
-            docker run -d --name buzzit-backend-container -p 4000:4000 --env-file .env buzzit-backend
+
+            echo "==> Starting new container..."
+            docker run -d \
+              --name buzzit-backend-container \
+              --restart unless-stopped \
+              -p 4000:4000 \
+              --env-file .env \
+              buzzit-backend:latest
+
+            echo "==> Cleaning up old Docker images..."
+            docker image prune -f
+
+            echo "==> Deployment complete!"
