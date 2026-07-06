@@ -1,0 +1,33 @@
+name: Build Backend Docker Image
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: false # Set to true if you want to push to DockerHub later
+          tags: buzzit-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Add deployment steps here later (e.g., SSH into 51.20.9.183 and run docker-compose up)
