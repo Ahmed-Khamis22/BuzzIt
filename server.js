@@ -941,9 +941,14 @@ io.on('connection', (socket) => {
   // الحكم بيبدأ اللعبة
   socket.on('start-game', async (code) => {
     const room = rooms[code];
-    // Allow starting with 0 players for testing/dev mode
-    // if (Object.keys(room.players).length === 0) return;
     if (!room || room.status === 'PLAYING' || room.starting) return;
+    
+    // Require at least 2 active players to start (Production rule)
+    const activePlayersCount = Object.values(room.players).filter(p => !p.disconnected).length;
+    if (activePlayersCount < 2) {
+      socket.emit('error', 'لا يمكن بدء اللعبة بأقل من لاعبين!');
+      return;
+    }
     
     room.starting = true;
     try {
