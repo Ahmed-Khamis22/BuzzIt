@@ -83,6 +83,79 @@ const buzzerQuestions = [
   { text: "أوصف الكلمة دي بدون ما تقولها: 'دكتور سنان'", answer: "دكتور سنان", category: "describe-it", difficulty: "medium", isCustomTrivia: false },
 ];
 
+// Procedural Generation: Reversed Words
+const arabicWords = require('./data/drawWords.json'); // We will use the expanded draw words list
+arabicWords.forEach(word => {
+  if (word.length >= 3) {
+    const reversed = word.split('').reverse().join('');
+    buzzerQuestions.push({
+      text: `اقرأ الكلمة المعكوسة ليخمنها اللاعبون: ${reversed}`,
+      answer: word,
+      category: "reversed-words",
+      difficulty: word.length <= 4 ? "easy" : (word.length <= 6 ? "medium" : "hard"),
+      isCustomTrivia: false
+    });
+  }
+});
+
+// Procedural Generation: Math & Quick Thinking (Buzzer)
+// We will generate 1000 math questions (multiplication, addition, subtraction)
+for (let i = 0; i < 500; i++) {
+  const num1 = Math.floor(Math.random() * 12) + 2;
+  const num2 = Math.floor(Math.random() * 12) + 2;
+  buzzerQuestions.push({
+    text: `كم حاصل ضرب ${num1} في ${num2}؟`,
+    answer: (num1 * num2).toString(),
+    category: "general-knowledge",
+    difficulty: "easy",
+    isCustomTrivia: false
+  });
+}
+for (let i = 0; i < 300; i++) {
+  const num1 = Math.floor(Math.random() * 100) + 20;
+  const num2 = Math.floor(Math.random() * 100) + 20;
+  buzzerQuestions.push({
+    text: `كم حاصل جمع ${num1} زائد ${num2}؟`,
+    answer: (num1 + num2).toString(),
+    category: "general-knowledge",
+    difficulty: "medium",
+    isCustomTrivia: false
+  });
+}
+for (let i = 0; i < 200; i++) {
+  const num1 = Math.floor(Math.random() * 200) + 100;
+  const num2 = Math.floor(Math.random() * 50) + 10;
+  buzzerQuestions.push({
+    text: `كم حاصل طرح ${num1} ناقص ${num2}؟`,
+    answer: (num1 - num2).toString(),
+    category: "general-knowledge",
+    difficulty: "hard",
+    isCustomTrivia: false
+  });
+}
+
+// Procedural Generation: Trivia Math
+for (let i = 0; i < 300; i++) {
+  const num1 = Math.floor(Math.random() * 10) + 3;
+  const num2 = Math.floor(Math.random() * 10) + 3;
+  const ans = num1 * num2;
+  const choices = [
+    (ans).toString(),
+    (ans + Math.floor(Math.random() * 5) + 1).toString(),
+    (ans - Math.floor(Math.random() * 5) - 1).toString(),
+    (ans + 10).toString()
+  ].sort(() => Math.random() - 0.5);
+  
+  triviaQuestions.push({
+    text: `كم حاصل ضرب ${num1} في ${num2}؟`,
+    answer: ans.toString(),
+    choices: choices,
+    category: "general-knowledge",
+    difficulty: "easy",
+    isCustomTrivia: true
+  });
+}
+
 async function seedMassiveQuestions() {
   try {
     console.log('Connecting to MongoDB...');

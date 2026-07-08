@@ -534,15 +534,24 @@ async function fetchAndSendNextQuestion(code) {
     matchStage.difficulty = room.config.difficulty;
   }
 
+  // Prevent consecutive categories if multiple are selected
+  let activeCategories = categories && categories.length > 0 ? categories : null;
+  if (activeCategories && activeCategories.length > 1 && room.lastCategory) {
+    const filtered = activeCategories.filter(c => c !== room.lastCategory);
+    if (filtered.length > 0) {
+      activeCategories = filtered;
+    }
+  }
+
   if (room.config?.gameMode === 'trivia') {
     matchStage.isCustomTrivia = true; // ONLY use custom trivia questions
-    if (categories && categories.length > 0) {
-      matchStage.category = { $in: categories };
+    if (activeCategories) {
+      matchStage.category = { $in: activeCategories };
     }
   } else {
     matchStage.isCustomTrivia = { $ne: true }; // Buzzer MUST NOT use trivia questions
-    if (categories && categories.length > 0) {
-      matchStage.category = { $in: categories };
+    if (activeCategories) {
+      matchStage.category = { $in: activeCategories };
     }
   }
 
@@ -570,6 +579,7 @@ async function fetchAndSendNextQuestion(code) {
     if (samples && samples.length > 0) {
       const question = samples[0];
       room.currentQuestion = question;
+      room.lastCategory = question.category; // Track category to prevent consecutive repetitions
       room.answerRevealed = false;
       room.buzzer = null;
 
