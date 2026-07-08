@@ -705,7 +705,7 @@ io.on('connection', (socket) => {
     // Check for reconnecting player
     let reconnectingId = null;
     for (const [id, p] of Object.entries(room.players)) {
-      if (p.disconnected && ((userId && p.userId === userId) || (!userId && p.name === playerName))) {
+      if ((userId && p.userId === userId) || (!userId && p.name === playerName)) {
         reconnectingId = id;
         break;
       }
