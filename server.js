@@ -518,128 +518,144 @@ async function startNextDrawRound(code) {
   }, timeLimit * 1000);
 }
 
-async function fetchAndSendNextQuestion(code) {
-  const room = rooms[code];
-  if (!room) return false;
-
-  if (!room.usedQuestions) {
-    room.usedQuestions = [];
-  }
-
+async function buildMatchStage(room) {
   const categories = room.config?.categories || [];
   const matchStage = {};
 
-  // Filter by difficulty if provided and not mixed
   if (room.config?.gameMode === 'trivia' && room.config?.difficulty && room.config.difficulty !== 'mixed') {
     matchStage.difficulty = room.config.difficulty;
   }
 
-  // Prevent consecutive categories if multiple are selected
   let activeCategories = categories && categories.length > 0 ? categories : null;
   if (activeCategories && activeCategories.length > 1 && room.lastCategory) {
     const filtered = activeCategories.filter(c => c !== room.lastCategory);
-    if (filtered.length > 0) {
-      activeCategories = filtered;
-    }
+    if (filtered.length > 0) activeCategories = filtered;
   }
 
   if (room.config?.gameMode === 'trivia') {
-    matchStage.isCustomTrivia = true; // ONLY use custom trivia questions
-    if (activeCategories) {
-      matchStage.category = { $in: activeCategories };
-    }
+    matchStage.isCustomTrivia = true;
+    if (activeCategories) matchStage.category = { $in: activeCategories };
   } else {
-    matchStage.isCustomTrivia = { $ne: true }; // Buzzer MUST NOT use trivia questions
-    if (activeCategories) {
-      matchStage.category = { $in: activeCategories };
-    }
+    matchStage.isCustomTrivia = { $ne: true };
+    if (activeCategories) matchStage.category = { $in: activeCategories };
   }
 
-  if (room.usedQuestions.length > 0) {
+  if (room.usedQuestions && room.usedQuestions.length > 0) {
     matchStage._id = { $nin: room.usedQuestions };
   }
 
-  try {
-    let samples = await Question.aggregate([
-      { $match: matchStage },
-      { $sample: { size: 1 } }
-    ]);
+  return matchStage;
+}
 
-    // If all questions are used, reset the pool and query again
-    if ((!samples || samples.length === 0) && room.usedQuestions.length > 0) {
-      logDebug(`[Question Pool] All questions used. Resetting question pool for room: ${code}`);
-      room.usedQuestions = [];
-      delete matchStage._id;
-      samples = await Question.aggregate([
-        { $match: matchStage },
-        { $sample: { size: 1 } }
-      ]);
+async function fetchOneQuestion(room) {
+  if (!room.usedQuestions) room.usedQuestions = [];
+  let matchStage = await buildMatchStage(room);
+
+  let samples = await Question.aggregate([{ $match: matchStage }, { $sample: { size: 1 } }]);
+
+  if ((!samples || samples.length === 0) && room.usedQuestions.length > 0) {
+    logDebug(`[Question Pool] All questions used. Resetting pool.`);
+    room.usedQuestions = [];
+    delete matchStage._id;
+    samples = await Question.aggregate([{ $match: matchStage }, { $sample: { size: 1 } }]);
+  }
+
+  return (samples && samples.length > 0) ? samples[0] : null;
+}
+
+// Pre-fetch next question in background so it's ready instantly
+function prefetchNextQuestion(code) {
+  const room = rooms[code];
+  if (!room || room.prefetching) return;
+  room.prefetching = true;
+  room.prefetchedQuestion = null;
+
+  // Build a temporary snapshot of usedQuestions to avoid race conditions
+  const usedSnapshot = [...(room.usedQuestions || [])]; 
+  const tempRoom = { ...room, usedQuestions: usedSnapshot };
+
+  fetchOneQuestion(tempRoom).then(q => {
+    if (rooms[code]) {
+      rooms[code].prefetchedQuestion = q || null;
+      rooms[code].prefetching = false;
     }
+  }).catch(() => {
+    if (rooms[code]) rooms[code].prefetching = false;
+  });
+}
 
-    if (samples && samples.length > 0) {
-      const question = samples[0];
-      room.currentQuestion = question;
-      room.lastCategory = question.category; // Track category to prevent consecutive repetitions
-      room.answerRevealed = false;
-      room.buzzer = null;
+async function fetchAndSendNextQuestion(code) {
+  const room = rooms[code];
+  if (!room) return false;
 
-      // Track as used
+  if (!room.usedQuestions) room.usedQuestions = [];
+
+  let question = null;
+
+  // Use pre-fetched question if available
+  if (room.prefetchedQuestion) {
+    question = room.prefetchedQuestion;
+    room.prefetchedQuestion = null;
+    // Mark it as used if not already
+    if (!room.usedQuestions.some(id => id.toString() === question._id.toString())) {
       room.usedQuestions.push(question._id);
-
-      room.triviaAnswers = {}; // Reset answers for the new round
-      room.lifelines = {}; // Reset lifelines for the new round
-      if (room.triviaTimer) {
-        clearTimeout(room.triviaTimer);
-        room.triviaTimer = null;
-      }
-
-      const timeLimit = room.config?.timeLimit || 15;
-      const endTime = room.config?.gameMode === 'trivia' ? Date.now() + (timeLimit * 1000) + 2000 : undefined;
-
-      // Emit to everyone without answer
-      io.to(code).emit('question-updated', {
-        text: question.text,
-        category: question.category,
-        flagImage: question.flagImage,
-        choices: room.config?.gameMode === 'trivia' ? question.choices : undefined,
-        endTime
-      });
-
-      // If trivia mode and question has a flag image, reveal it immediately to all players
-      if (room.config?.gameMode === 'trivia' && question.flagImage) {
-        io.to(code).emit('image-revealed', question.flagImage);
-      }
-
-      // Emit answer to host only (if they are a judge)
-      io.to(room.host).emit('reveal-answer-updated', {
-        answer: question.answer
-      });
-
-      // Reset buzzer
-      io.to(code).emit('buzz-reset');
-
-      // If Trivia mode, start timer based on config
-      if (room.config?.gameMode === 'trivia') {
-        room.evaluatingTrivia = false; // reset for new round
-        if (timeLimit > 0) {
-          room.triviaTimer = setTimeout(() => {
-            evaluateTriviaRound(code);
-          }, (timeLimit * 1000) + 2000);
-        }
-      }
-
-      return true;
-    } else {
-      io.to(room.host).emit('error', 'لم يتم العثور على أسئلة في التصنيفات المحددة!');
+    }
+  } else {
+    // Fallback: fetch now (first question of a game)
+    try {
+      question = await fetchOneQuestion(room);
+      if (question) room.usedQuestions.push(question._id);
+    } catch (err) {
+      console.error('Failed to get next question:', err);
+      io.to(room.host).emit('error', 'حدث خطأ أثناء تحميل السؤال!');
       setTimeout(() => triggerEndGame(code), 2000);
       return false;
     }
-  } catch (err) {
-    console.error('Failed to get next question:', err);
-    io.to(room.host).emit('error', 'حدث خطأ أثناء تحميل السؤال!');
+  }
+
+  if (!question) {
+    io.to(room.host).emit('error', 'لم يتم العثور على أسئلة في التصنيفات المحددة!');
     setTimeout(() => triggerEndGame(code), 2000);
     return false;
   }
+
+  room.currentQuestion = question;
+  room.lastCategory = question.category;
+  room.answerRevealed = false;
+  room.buzzer = null;
+  room.triviaAnswers = {};
+  room.lifelines = {};
+  if (room.triviaTimer) { clearTimeout(room.triviaTimer); room.triviaTimer = null; }
+
+  const timeLimit = room.config?.timeLimit || 15;
+  const endTime = room.config?.gameMode === 'trivia' ? Date.now() + (timeLimit * 1000) + 2000 : undefined;
+
+  io.to(code).emit('question-updated', {
+    text: question.text,
+    category: question.category,
+    flagImage: question.flagImage,
+    choices: room.config?.gameMode === 'trivia' ? question.choices : undefined,
+    endTime
+  });
+
+  if (room.config?.gameMode === 'trivia' && question.flagImage) {
+    io.to(code).emit('image-revealed', question.flagImage);
+  }
+
+  io.to(room.host).emit('reveal-answer-updated', { answer: question.answer });
+  io.to(code).emit('buzz-reset');
+
+  if (room.config?.gameMode === 'trivia') {
+    room.evaluatingTrivia = false;
+    if (timeLimit > 0) {
+      room.triviaTimer = setTimeout(() => evaluateTriviaRound(code), (timeLimit * 1000) + 2000);
+    }
+  }
+
+  // Start pre-fetching the NEXT question immediately in the background
+  prefetchNextQuestion(code);
+
+  return true;
 }
 
 io.on('connection', (socket) => {
@@ -1270,10 +1286,15 @@ io.on('connection', (socket) => {
     // For this round
     room.lifelines[socket.id] = type;
 
-    // Handle freeze lifeline effect
+    // Handle freeze lifeline effect — only freeze players who haven't answered yet
     if (type === 'freeze') {
       const freezerName = room.players[socket.id]?.name || 'لاعب';
-      socket.broadcast.to(code).emit('player-frozen', freezerName);
+      const alreadyAnswered = new Set(Object.keys(room.triviaAnswers || {}));
+      Object.keys(room.players).forEach(playerId => {
+        if (playerId !== socket.id && !alreadyAnswered.has(playerId)) {
+          io.to(playerId).emit('player-frozen', freezerName);
+        }
+      });
     }
     
     // Handle 50:50 lifeline effect
