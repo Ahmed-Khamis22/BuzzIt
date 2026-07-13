@@ -28,6 +28,9 @@ app.use('/api/store', storeRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/feedback', feedbackRoutes);
 
+app.get('/health', (req, res) => res.status(200).send('OK'));
+app.get('/', (req, res) => res.status(200).send('BuzzIt Server is running'));
+
 const server = http.createServer(app);
 const io = new Server(server);
 
