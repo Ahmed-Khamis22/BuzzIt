@@ -18,13 +18,14 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'username, email and password are required' });
     }
 
-    const existing = await User.findOne({ $or: [{ email }, { username }] });
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await User.findOne({ $or: [{ email: normalizedEmail }, { username }] });
     if (existing) {
       console.log('[BACKEND] Registration failed: User already exists');
       return res.status(409).json({ error: 'Username or email already in use' });
     }
 
-    const user = await User.create({ username, email, password });
+    const user = await User.create({ username, email: normalizedEmail, password });
     const populatedUser = await User.findById(user._id)
       .select('-password')
       .populate('inventory')
@@ -51,7 +52,8 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'email and password are required' });
     }
 
-    const user = await User.findOne({ email });
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(401).json({ error: 'هذا الإيميل غير مسجل، يرجى إنشاء حساب جديد أولاً.' });
     }
