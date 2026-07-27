@@ -64,6 +64,12 @@ async function triggerEndGame(code, payload = {}) {
   const room = rooms[code];
   if (!room || room.status === 'RESULTS') return;
 
+  // Cancel any in-flight round timers so they can't fire after the game has
+  // already ended and mutate scores that were already saved to the DB.
+  if (room.buzzTimeout) { clearTimeout(room.buzzTimeout); room.buzzTimeout = null; }
+  if (room.triviaTimer) { clearTimeout(room.triviaTimer); room.triviaTimer = null; }
+  if (room.drawRoundTimer) { clearTimeout(room.drawRoundTimer); room.drawRoundTimer = null; }
+
   room.status = 'RESULTS';
   if (payload.totalRounds) room.totalRounds = payload.totalRounds;
   if (payload.categories) room.categories = payload.categories;
@@ -1003,8 +1009,9 @@ io.on('connection', (socket) => {
     // Usually host can just press start-game. If players vote, they just need majority of players.
     
     io.to(code).emit('vote-count-updated', room.votesToPlayAgain.size, activePlayersCount);
-    
-    if (room.votesToPlayAgain.size > Math.floor(activePlayersCount / 2)) {
+
+    const meetsMinPlayers = ALLOW_SOLO_TEST || activePlayersCount >= 2;
+    if (meetsMinPlayers && room.votesToPlayAgain.size > Math.floor(activePlayersCount / 2)) {
       await handleStartGame(code, null);
     }
   });
@@ -1128,6 +1135,7 @@ io.on('connection', (socket) => {
       console.log(`give-point error: Room ${code} not found`);
       return;
     }
+    if (room.host !== socket.id) return;
     if (room.status !== 'PLAYING') {
       console.log(`give-point error: Room status is ${room.status}, not PLAYING`);
       return;
@@ -1203,6 +1211,7 @@ io.on('connection', (socket) => {
       console.log(`give-card error: Room ${code} not found`);
       return;
     }
+    if (room.host !== socket.id) return;
     if (room.status !== 'PLAYING') {
       console.log(`give-card error: Room status is ${room.status}, not PLAYING`);
       return;
@@ -1246,7 +1255,7 @@ io.on('connection', (socket) => {
   socket.on('reset-score', ({ code, playerId }) => {
     console.log(`Server received reset-score: code=${code}, playerId=${playerId}`);
     const room = rooms[code];
-    if (!room || room.status !== 'PLAYING') return;
+    if (!room || room.host !== socket.id || room.status !== 'PLAYING') return;
 
     room.scores[playerId] = 0;
 
@@ -1275,7 +1284,7 @@ io.on('connection', (socket) => {
   // جلب السؤال التالي للحكم واللاعبين
   socket.on('next-question', async (code) => {
     const room = rooms[code];
-    if (!room || room.status !== 'PLAYING') return;
+    if (!room || room.host !== socket.id || room.status !== 'PLAYING') return;
 
     if (room.buzzTimeout) {
       clearTimeout(room.buzzTimeout);
@@ -1293,7 +1302,7 @@ io.on('connection', (socket) => {
   // إظهار الإجابة للحكم فقط
   socket.on('reveal-answer', (code) => {
     const room = rooms[code];
-    if (!room || !room.currentQuestion) return;
+    if (!room || room.host !== socket.id || !room.currentQuestion) return;
 
     room.answerRevealed = true;
     socket.emit('reveal-answer-updated', {
