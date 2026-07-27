@@ -637,6 +637,7 @@ async function fetchAndSendNextQuestion(code) {
   room.buzzer = null;
   room.triviaAnswers = {};
   room.lifelines = {};
+  room.frozenPlayers = new Set();
   if (room.triviaTimer) { clearTimeout(room.triviaTimer); room.triviaTimer = null; }
 
   const timeLimit = room.config?.timeLimit || 15;
@@ -944,6 +945,7 @@ io.on('connection', (socket) => {
     room.usedQuestions = [];
     room.usedLifelines = {};
     room.lifelines = {};
+    room.frozenPlayers = new Set();
 
     if (room.config.gameMode === 'draw') {
       room.drawnPlayers = [];
@@ -1332,9 +1334,11 @@ io.on('connection', (socket) => {
       usedDouble: room.lifelines && room.lifelines[socket.id] === 'double',
     };
 
-    // If all active players have answered, evaluate immediately
+    // If everyone still able to answer has answered (frozen players can never
+    // submit this round, so they shouldn't hold up early evaluation), evaluate immediately
     const activePlayersCount = Object.values(room.players).filter(p => !p.disconnected).length;
-    if (Object.keys(room.triviaAnswers).length >= activePlayersCount) {
+    const frozenCount = room.frozenPlayers ? room.frozenPlayers.size : 0;
+    if (Object.keys(room.triviaAnswers).length >= (activePlayersCount - frozenCount)) {
       evaluateTriviaRound(code);
     }
   });
@@ -1364,11 +1368,22 @@ io.on('connection', (socket) => {
     if (type === 'freeze') {
       const freezerName = room.players[socket.id]?.name || 'لاعب';
       const alreadyAnswered = new Set(Object.keys(room.triviaAnswers || {}));
+      if (!room.frozenPlayers) room.frozenPlayers = new Set();
       Object.keys(room.players).forEach(playerId => {
         if (playerId !== socket.id && !alreadyAnswered.has(playerId)) {
+          room.frozenPlayers.add(playerId);
           io.to(playerId).emit('player-frozen', freezerName);
         }
       });
+
+      // Frozen players can never submit an answer this round — if everyone
+      // who's still able to answer already has, evaluate immediately instead
+      // of waiting for the full timer to expire.
+      const activePlayersCount = Object.values(room.players).filter(p => !p.disconnected).length;
+      const answerableCount = activePlayersCount - room.frozenPlayers.size;
+      if (Object.keys(room.triviaAnswers || {}).length >= answerableCount) {
+        evaluateTriviaRound(code);
+      }
     }
     
     // Handle 50:50 lifeline effect
