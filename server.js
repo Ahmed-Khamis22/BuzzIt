@@ -1,4 +1,7 @@
 require('dotenv').config();
+// Explicit opt-in only — must be set to 'true' in a LOCAL .env file (never on the deployed server)
+// so solo-testing can never accidentally activate in production.
+const ALLOW_SOLO_TEST = process.env.ALLOW_SOLO_TEST === 'true';
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -972,9 +975,9 @@ io.on('connection', (socket) => {
     const room = rooms[code];
     if (!room || room.status === 'PLAYING' || room.starting) return;
     
-    // Require at least 2 active players to start (Production rule)
+    // Require at least 2 active players to start (Production rule) — skipped only with explicit ALLOW_SOLO_TEST=true
     const activePlayersCount = Object.values(room.players).filter(p => !p.disconnected).length;
-    if (activePlayersCount < 2) {
+    if (!ALLOW_SOLO_TEST && activePlayersCount < 2) {
       socket.emit('error', 'لا يمكن بدء اللعبة بأقل من لاعبين!');
       return;
     }
@@ -1616,7 +1619,10 @@ function normalizeArabic(text) {
     let publicRoomsChanged = false;
     for (const code in rooms) {
       const room = rooms[code];
-      if (room.players[socket.id]) {
+      const isPlayer = !!room.players[socket.id];
+      const isHost = room.host === socket.id;
+
+      if (isPlayer) {
         // Player disconnected - don't delete, mark as disconnected
         room.players[socket.id].disconnected = true;
         const name = room.players[socket.id].name;
@@ -1638,17 +1644,23 @@ function normalizeArabic(text) {
           });
           endDrawRound(code);
         }
-        
+
         if (room.votesToPlayAgain?.has(socket.id)) {
           room.votesToPlayAgain.delete(socket.id);
           const activeCount = Object.values(room.players).filter(pl => !pl.disconnected).length;
           io.to(code).emit('vote-count-updated', room.votesToPlayAgain.size, activeCount);
         }
-      } else if (room.host === socket.id) {
+      }
+
+      // Checked independently of isPlayer: in trivia/draw the host is also
+      // added to room.players, so both branches must be able to run —
+      // otherwise a host-who-is-a-player disconnecting never starts the
+      // host-reconnect timer, and the room never gets cleaned up (BUG: ghost rooms).
+      if (isHost) {
         // Host disconnected - wait for them to reconnect
         room.hostDisconnected = true;
         io.to(code).emit('host-disconnected');
-        
+
         // Give the host 2 minutes to return
         room.hostTimeout = setTimeout(() => {
           if (rooms[code] && rooms[code].hostDisconnected) {
@@ -1669,7 +1681,7 @@ function normalizeArabic(text) {
             io.emit('public-rooms-update', getPublicRooms());
           }
         }, 120000); // 2 minutes
-        
+
         publicRoomsChanged = true;
       }
     }
