@@ -1031,8 +1031,28 @@ io.on('connection', (socket) => {
     const room = rooms[code];
     if (!room || room.status !== 'PLAYING' || room.buzzer) return;
 
+    // Fixed-judge host is allowed to also play — first time they buzz,
+    // register them as a scoring player so their score counts and shows
+    // in the leaderboard/results like anyone else's.
+    if (room.config?.judgeMode === 'host' && socket.id === room.host && !room.players[socket.id]) {
+      room.players[socket.id] = { name: room.hostName, userId: room.hostUserId || null, disconnected: false, equippedItems: room.hostEquippedItems || null };
+      room.scores[socket.id] = room.scores[socket.id] || 0;
+      room.correct[socket.id] = room.correct[socket.id] || 0;
+      room.wrong[socket.id] = room.wrong[socket.id] || 0;
+      if (!room.cards) room.cards = {};
+      room.cards[socket.id] = room.cards[socket.id] || { yellow: 0, red: 0 };
+      io.to(code).emit('player-joined', {
+        id: socket.id,
+        name: room.hostName,
+        score: room.scores[socket.id],
+        equippedItems: room.hostEquippedItems || null,
+        cards: room.cards[socket.id],
+        userId: room.hostUserId || null,
+      });
+    }
+
     room.buzzer = socket.id;
-    
+
     // Check if timeLimit is set
     const timeLimit = room.config?.timeLimit || 0;
     
@@ -1115,8 +1135,7 @@ io.on('connection', (socket) => {
 
     // In written mode: auto-judge by comparing to the correct answer
     if (room.config?.answerMode === 'written' && room.currentQuestion?.answer) {
-      const normalize = (s) => s.trim().toLowerCase().replace(/[\u064B-\u065F]/g, '').replace(/\s+/g, ' ');
-      const isCorrect = normalize(trimmedAnswer) === normalize(room.currentQuestion.answer);
+      const isCorrect = normalizeArabic(trimmedAnswer) === normalizeArabic(room.currentQuestion.answer);
 
       // Notify the host so they can confirm or override
       io.to(room.host).emit('buzzer-auto-judged', {
