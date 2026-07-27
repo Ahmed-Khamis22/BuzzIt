@@ -6,9 +6,35 @@ const router = express.Router();
 
 router.get('/leaderboard', async (req, res) => {
   try {
+    const { type } = req.query;
+    if (type === 'friends') {
+      const header = req.headers.authorization;
+      if (!header || !header.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'مطلوب تسجيل الدخول لعرض ترتيب الأصدقاء.' });
+      }
+      const jwt = require('jsonwebtoken');
+      const token = header.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const callerId = decoded.userId;
+
+      const callerUser = await User.findById(callerId);
+      if (!callerUser) {
+        return res.status(404).json({ error: 'المستخدم غير موجود.' });
+      }
+
+      const friendIds = [callerUser._id, ...(callerUser.friends || [])];
+      const friendUsers = await User.find({ _id: { $in: friendIds } })
+        .sort({ totalWins: -1 })
+        .select('username totalWins totalGames totalCorrect totalWrong equippedItems')
+        .populate('equippedItems.avatar')
+        .populate('equippedItems.border');
+
+      return res.json(friendUsers);
+    }
+
     const topUsers = await User.find()
       .sort({ totalWins: -1 })
-      .limit(10)
+      .limit(50)
       .select('username totalWins totalGames totalCorrect totalWrong equippedItems')
       .populate('equippedItems.avatar')
       .populate('equippedItems.border');

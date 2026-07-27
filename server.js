@@ -1058,6 +1058,65 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Room Chat Event
+  socket.on('send-room-chat', ({ code, text }) => {
+    if (!code || !text || typeof text !== 'string' || !text.trim()) return;
+    const room = rooms[code];
+    if (!room) return;
+
+    const player = room.players[socket.id];
+    const isHost = room.host === socket.id;
+    if (!player && !isHost) return;
+
+    const senderName = player ? player.name : room.hostName;
+    const equippedItems = player ? player.equippedItems : room.hostEquippedItems;
+
+    const msgObj = {
+      id: Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+      senderId: socket.id,
+      senderName: senderName || 'لاعب',
+      equippedItems,
+      text: text.trim().slice(0, 150),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    io.to(code).emit('room-chat-received', msgObj);
+  });
+
+  // Submit Buzzer Answer Event (Remote/Written Play)
+  socket.on('submit-buzzer-answer', ({ code, answer }) => {
+    if (!code || !answer) return;
+    const room = rooms[code];
+    if (!room || room.status !== 'PLAYING') return;
+
+    if (room.buzzer !== socket.id) return;
+
+    const trimmedAnswer = answer.trim();
+    room.buzzedAnswer = trimmedAnswer;
+
+    // Broadcast to everyone so host sees the written answer
+    io.to(code).emit('buzzer-answer-submitted', {
+      playerId: socket.id,
+      name: room.players[socket.id]?.name || 'لاعب',
+      answer: trimmedAnswer
+    });
+
+    // In written mode: auto-judge by comparing to the correct answer
+    if (room.config?.answerMode === 'written' && room.currentQuestion?.answer) {
+      const normalize = (s) => s.trim().toLowerCase().replace(/[\u064B-\u065F]/g, '').replace(/\s+/g, ' ');
+      const isCorrect = normalize(trimmedAnswer) === normalize(room.currentQuestion.answer);
+
+      // Notify the host so they can confirm or override
+      io.to(room.host).emit('buzzer-auto-judged', {
+        playerId: socket.id,
+        playerName: room.players[socket.id]?.name || 'لاعب',
+        playerAnswer: trimmedAnswer,
+        correctAnswer: room.currentQuestion.answer,
+        isCorrect,
+      });
+    }
+  });
+
   // الحكم بيدي نقطة
   socket.on('give-point', async ({ code, playerId, points }) => {
     console.log(`Server received give-point: code=${code}, playerId=${playerId}, points=${points}`);
