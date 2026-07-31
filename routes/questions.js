@@ -37,4 +37,23 @@ router.post('/', auth, admin, async (req, res) => {
   }
 });
 
+router.post('/:id/report', auth, async (req, res) => {
+  try {
+    const question = await Question.findById(req.params.id);
+    if (!question) return res.status(404).json({ error: 'السؤال غير موجود.' });
+
+    if (question.reportedBy.some((id) => String(id) === String(req.userId))) {
+      return res.status(409).json({ error: 'أبلغت عن هذا السؤال بالفعل.' });
+    }
+
+    question.reportedBy.push(req.userId);
+    question.reportCount += 1;
+    await question.save();
+
+    res.json({ success: true, reportCount: question.reportCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

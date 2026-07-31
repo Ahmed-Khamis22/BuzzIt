@@ -1,12 +1,17 @@
 const express = require('express');
 const User = require('../models/User');
+const GameHistory = require('../models/GameHistory');
 const auth = require('../middleware/auth');
+const { TASKS: DAILY_TASKS, resetDailyTasksIfStale, getDailyTasksState } = require('../services/dailyTasks');
 
 const router = express.Router();
 
 router.get('/leaderboard', async (req, res) => {
   try {
-    const { type } = req.query;
+    const { type, page = 1, limit = 50 } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
     if (type === 'friends') {
       const header = req.headers.authorization;
       if (!header || !header.startsWith('Bearer ')) {
@@ -25,6 +30,8 @@ router.get('/leaderboard', async (req, res) => {
       const friendIds = [callerUser._id, ...(callerUser.friends || [])];
       const friendUsers = await User.find({ _id: { $in: friendIds } })
         .sort({ totalWins: -1 })
+        .skip(skip)
+        .limit(limitNum)
         .select('username totalWins totalGames totalCorrect totalWrong equippedItems')
         .populate('equippedItems.avatar')
         .populate('equippedItems.border');
@@ -34,7 +41,8 @@ router.get('/leaderboard', async (req, res) => {
 
     const topUsers = await User.find()
       .sort({ totalWins: -1 })
-      .limit(50)
+      .skip(skip)
+      .limit(limitNum)
       .select('username totalWins totalGames totalCorrect totalWrong equippedItems')
       .populate('equippedItems.avatar')
       .populate('equippedItems.border');
@@ -62,75 +70,334 @@ router.put('/theme', auth, async (req, res) => {
   }
 });
 
-router.put('/coins', auth, async (req, res) => {
+// ── Daily login reward ──
+// Flat 5 coins a day, doubling to 10 on every 7th day of the streak, then the
+// cycle repeats (days 7, 14, 21 … are the payout days).
+const DAILY_BASE = 5;
+const DAILY_BONUS = 10;
+const DAILY_BONUS_EVERY = 7;   // days 7, 14, 21 … pay double
+// One week at a time. Thirty cells told the player "twenty days to go", which
+// reads as a chore; a week ending in the big prize reads as almost there.
+const DAILY_CYCLE = 7;
+
+function dailyAmountFor(day) {
+  return day % DAILY_BONUS_EVERY === 0 ? DAILY_BONUS : DAILY_BASE;
+}
+
+function startOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function dailyStateFor(user) {
+  const today = startOfDay(new Date());
+  const last = user.lastDailyReward ? startOfDay(user.lastDailyReward) : null;
+  const claimedToday = !!last && last.getTime() === today.getTime();
+
+  // A streak survives only if the previous claim was yesterday.
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const continues = !!last && last.getTime() === yesterday.getTime();
+
+  const streak = claimedToday ? user.dailyStreak : (continues ? user.dailyStreak + 1 : 1);
+  const amount = dailyAmountFor(streak);
+
+  const doubled = !!user.dailyDoubledAt && startOfDay(user.dailyDoubledAt).getTime() === today.getTime();
+
+  // The calendar the app draws. Built here so the UI can never show an
+  // amount the server wouldn't actually pay out.
+  const cycleStart = streak - ((streak - 1) % DAILY_CYCLE);
+  const days = [];
+  for (let i = 0; i < DAILY_CYCLE; i++) {
+    const day = cycleStart + i;
+    days.push({
+      day,
+      amount: dailyAmountFor(day),
+      bonus: day % DAILY_BONUS_EVERY === 0,
+      state: day < streak || (day === streak && claimedToday)
+        ? 'claimed'
+        : day === streak
+          ? 'today'
+          : 'upcoming',
+    });
+  }
+
+  return { claimedToday, streak, amount, doubled, days, week: Math.ceil(streak / DAILY_CYCLE) };
+}
+
+// What the Home screen shows before the player taps anything.
+router.get('/daily-reward', auth, async (req, res) => {
   try {
-    const secret = req.headers['x-app-secret'];
-    if (secret !== process.env.APP_SECRET) {
-      return res.status(403).json({ error: 'Unauthorized request' });
-    }
-
-    const { amount } = req.body;
-    if (typeof amount !== 'number') {
-      return res.status(400).json({ error: 'amount must be a number' });
-    }
-
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
-
-    if (user.coins + amount < 0) {
-      return res.status(400).json({ error: 'Insufficient coins' });
-    }
-
-    user.coins += amount;
-    await user.save();
-
-    res.json({ coins: user.coins });
+    const s = dailyStateFor(user);
+    res.json({ claimedToday: s.claimedToday, streak: s.streak, amount: s.amount, doubled: s.doubled, days: s.days, week: s.week });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-router.put('/gems', auth, async (req, res) => {
+router.post('/daily-reward', auth, async (req, res) => {
   try {
-    const secret = req.headers['x-app-secret'];
-    if (secret !== process.env.APP_SECRET) {
-      return res.status(403).json({ error: 'Unauthorized request' });
-    }
-
-    const { amount } = req.body;
-    if (typeof amount !== 'number') {
-      return res.status(400).json({ error: 'amount must be a number' });
-    }
-
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (user.gems + amount < 0) {
-      return res.status(400).json({ error: 'Insufficient gems' });
+    const s = dailyStateFor(user);
+    if (s.claimedToday) {
+      return res.status(409).json({ error: 'استلمت مكافأة اليوم بالفعل. تعال بكرة!' });
     }
 
-    user.gems += amount;
+    user.coins += s.amount;
+    user.dailyStreak = s.streak;
+    user.lastDailyReward = new Date();
     await user.save();
 
-    res.json({ gems: user.gems });
+    res.json({ reward: s.amount, streak: s.streak, coins: user.coins });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Doubling is a rewarded-ad perk: the server checks the claim happened today and
+// hasn't already been doubled, so the client can't ask for it twice.
+router.post('/daily-reward/double', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const s = dailyStateFor(user);
+    if (!s.claimedToday) return res.status(400).json({ error: 'استلم مكافأة اليوم الأول.' });
+    if (s.doubled) return res.status(409).json({ error: 'ضاعفت مكافأة اليوم بالفعل.' });
+
+    user.coins += s.amount;
+    user.dailyDoubledAt = new Date();
+    await user.save();
+
+    res.json({ reward: s.amount, coins: user.coins });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Daily tasks ──
+// What the Home screen shows before the player taps anything.
+router.get('/daily-tasks', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (resetDailyTasksIfStale(user)) await user.save();
+    res.json({ tasks: getDailyTasksState(user), bonusClaimed: (user.dailyTasksClaimed || []).includes('daily_bonus') });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Called right after the "watch an ad" task's own rewarded ad finishes — bumps
+// progress only, the coin payout still happens through /daily-tasks/claim.
+router.post('/daily-tasks/watch-ad', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    resetDailyTasksIfStale(user);
+
+    user.totalAdsWatched = (user.totalAdsWatched || 0) + 1;
+    await user.save();
+
+    res.json({ tasks: getDailyTasksState(user) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/daily-tasks/claim', auth, async (req, res) => {
+  try {
+    const { taskId } = req.body;
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    resetDailyTasksIfStale(user);
+
+    // Manual Bonus Claim Logic
+    if (taskId === 'daily_bonus') {
+      const claimedTasks = user.dailyTasksClaimed || [];
+      const regularTasksCount = claimedTasks.filter(id => id !== 'daily_bonus').length;
+      
+      if (regularTasksCount < DAILY_TASKS.length) return res.status(400).json({ error: 'يجب إكمال جميع المهام أولاً.' });
+      if (claimedTasks.includes('daily_bonus')) return res.status(409).json({ error: 'تم استلام المكافأة الكبرى بالفعل.' });
+      
+      user.coins += 20;
+      user.dailyTasksClaimed.push('daily_bonus');
+      await user.save();
+      
+      return res.json({ reward: 20, coins: user.coins, tasks: getDailyTasksState(user), bonusClaimed: true });
+    }
+
+    const task = DAILY_TASKS.find((t) => t.id === taskId);
+    if (!task) return res.status(400).json({ error: 'مهمة غير صالحة.' });
+
+    const state = getDailyTasksState(user).find((t) => t.id === taskId);
+    if (!state.completed) return res.status(400).json({ error: 'لسه ما خلصتش المهمة دي.' });
+    if (state.claimed) return res.status(409).json({ error: 'استلمت مكافأة المهمة دي بالفعل.' });
+
+    user.coins += task.reward;
+    user.dailyTasksClaimed = [...(user.dailyTasksClaimed || []), taskId];
+    await user.save();
+
+    res.json({ reward: task.reward, coins: user.coins, tasks: getDailyTasksState(user), bonusClaimed: user.dailyTasksClaimed.includes('daily_bonus') });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Fixed payouts for rewarded ads. The client sends a reward *type*, never an
+// amount — otherwise anyone can ask for any number of coins without an ad.
+const AD_REWARDS = {
+  coins: { field: 'coins', amount: 50 },
+  coins_20: { field: 'coins', amount: 20 },
+  gems: { field: 'gems', amount: 2 },
+};
+
+// Daily ceiling so a scripted client can't farm this endpoint forever.
+const AD_REWARD_DAILY_CAP = 30;
+
+router.post('/claim-ad-reward', auth, async (req, res) => {
+  try {
+    const { rewardType } = req.body;
+    const reward = AD_REWARDS[rewardType];
+    if (!reward) return res.status(400).json({ error: 'نوع المكافأة غير صالح.' });
+
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const lastAt = user.lastAdRewardAt ? new Date(user.lastAdRewardAt) : null;
+    const sameDay = lastAt && lastAt >= today;
+    const usedToday = sameDay ? (user.adRewardsToday || 0) : 0;
+
+    if (usedToday >= AD_REWARD_DAILY_CAP) {
+      return res.status(429).json({ error: 'وصلت للحد الأقصى من مكافآت الإعلانات اليوم. عد غداً.' });
+    }
+
+    user[reward.field] += reward.amount;
+    user.adRewardsToday = usedToday + 1;
+    user.lastAdRewardAt = new Date();
+    user.totalAdsWatched = (user.totalAdsWatched || 0) + 1;
+    await user.save();
+
+    res.json({
+      reward: reward.amount,
+      field: reward.field,
+      coins: user.coins,
+      gems: user.gems,
+      remainingToday: AD_REWARD_DAILY_CAP - user.adRewardsToday,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// End-of-game reward chest, unlocked by watching a rewarded ad.
+// The server decides the amount from the recorded match result — the client
+// never sends a number — and each player can only claim once per game.
+router.post('/claim-game-reward', auth, async (req, res) => {
+  try {
+    const { roomCode } = req.body;
+    if (!roomCode || typeof roomCode !== 'string') {
+      return res.status(400).json({ error: 'roomCode is required' });
+    }
+
+    // Only a match that just finished can be claimed
+    const since = new Date(Date.now() - 30 * 60 * 1000);
+    const game = await GameHistory.findOne({
+      roomCode: roomCode.toUpperCase(),
+      playedAt: { $gte: since },
+    }).sort({ playedAt: -1 });
+
+    if (!game) return res.status(404).json({ error: 'لم نجد نتيجة لهذه اللعبة.' });
+
+    if ((game.rewardClaimedBy || []).some((id) => String(id) === String(req.userId))) {
+      return res.status(409).json({ error: 'استلمت مكافأة هذه اللعبة بالفعل.' });
+    }
+
+    const me = game.players.find((p) => p.userId && String(p.userId) === String(req.userId));
+    if (!me) return res.status(403).json({ error: 'لم تشارك في هذه اللعبة.' });
+
+    // Anti-farm: a real match, not two accounts opening and closing rooms
+    const registeredPlayers = game.players.filter((p) => p.userId).length;
+    const totalAnswers = game.players.reduce(
+      (sum, p) => sum + (p.correctAnswers || 0) + (p.wrongAnswers || 0),
+      0
+    );
+    if (registeredPlayers < 2 || totalAnswers < 3) {
+      return res.status(400).json({ error: 'اللعبة قصيرة جداً للحصول على مكافأة.' });
+    }
+
+    const isWinner = game.winnerId && String(game.winnerId) === String(req.userId);
+    const reward =
+      15 +
+      (isWinner ? 25 : 0) +
+      Math.min((me.correctAnswers || 0) * 2, 20);
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { $inc: { coins: reward } },
+      { new: true }
+    );
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    game.rewardClaimedBy.push(req.userId);
+    await game.save();
+
+    res.json({ reward, coins: user.coins, isWinner: !!isWinner });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /coins and PUT /gems used to live here. They let any authenticated client
+// set its own balance, "guarded" by an x-app-secret that was hardcoded in the
+// app bundle and sent on every request — so anyone who read the APK or watched
+// traffic could mint unlimited currency.
+//
+// Balances now only move through endpoints that own the amount themselves:
+//   gems  → POST /api/purchases/google/verify (verified against Google Play)
+//   coins → daily-reward, daily-tasks, claim-ad-reward, claim-game-reward,
+//           spin-wheel, exchange-gems-for-coins
+// Do not reintroduce a client-supplied amount here.
+
+// The only valid gem→coin packs. Kept server-side on purpose: the client used
+// to send both the price AND the payout, which let anyone mint unlimited coins.
+const COIN_PACKS = {
+  coins_100: { gemCost: 10, coinAmount: 100 },
+  coins_500: { gemCost: 45, coinAmount: 500 },
+  coins_1000: { gemCost: 80, coinAmount: 1000 },
+  coins_2500: { gemCost: 180, coinAmount: 2500 },
+};
 
 router.post('/exchange-gems-for-coins', auth, async (req, res) => {
   try {
-    const { gemCost, coinAmount } = req.body;
-    if (!gemCost || !coinAmount || gemCost <= 0 || coinAmount <= 0) {
-      return res.status(400).json({ error: 'البيانات غير صالحة.' });
+    const { packId, gemCost: legacyGemCost } = req.body;
+
+    // Resolve the pack from our own table — never from client-supplied amounts.
+    let pack = packId ? COIN_PACKS[packId] : null;
+    if (!pack && typeof legacyGemCost === 'number') {
+      // Older clients only send the price; match it against a known pack.
+      pack = Object.values(COIN_PACKS).find((p) => p.gemCost === legacyGemCost) || null;
+    }
+    if (!pack) {
+      return res.status(400).json({ error: 'الباقة غير صالحة.' });
     }
 
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: 'المستخدم غير موجود.' });
 
-    if (user.gems < gemCost) {
+    if (user.gems < pack.gemCost) {
       return res.status(400).json({ error: 'لا يوجد لديك جواهر كافية.' });
     }
+
+    const gemCost = pack.gemCost;
+    const coinAmount = pack.coinAmount;
 
     user.gems -= gemCost;
     user.coins += coinAmount;
@@ -155,9 +422,10 @@ router.post('/spin-wheel', auth, async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // TEMPORARILY DISABLED FOR TESTING
-    /*
-    if (user.lastSpinClaim) {
+    // Once-a-day limit. Without it the wheel is unlimited free coins, and the
+    // "watch an ad for an extra spin" offer is worthless.
+    // Set ALLOW_UNLIMITED_SPIN=true in .env to bypass while testing.
+    if (process.env.ALLOW_UNLIMITED_SPIN !== 'true' && user.lastSpinClaim) {
       const lastClaim = new Date(user.lastSpinClaim);
       lastClaim.setHours(0, 0, 0, 0);
 
@@ -165,7 +433,6 @@ router.post('/spin-wheel', auth, async (req, res) => {
         return res.status(400).json({ error: 'لقد قمت بلف عجلة الحظ اليوم بالفعل! عد غداً.' });
       }
     }
-    */
 
     const rewards = [
       { value: 5, weight: 35 },

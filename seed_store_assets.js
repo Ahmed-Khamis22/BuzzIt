@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const mongoose = require('mongoose');
 const StoreItem = require('./models/StoreItem');
 
@@ -285,6 +286,43 @@ async function seed() {
       isGemOnly: true,
       type: 'avatar',
       imageUrl: 'avatar_cyber_ronin',
+    },
+    {
+      name: 'الملكة كليوباترا',
+      description: 'أفاتار ملكي أسطوري للملكة كليوباترا بالتاج الذهبي والكحل الفرعوني المميز.',
+      price: 180,
+      type: 'avatar',
+      imageUrl: 'avatar_cleopatra',
+    },
+    {
+      name: 'ملكة الجيمنج (Gamer Queen)',
+      description: 'أفاتار كارتوني بناتي بسماعات قطة نيون ونظارة ألعاب عصرية.',
+      price: 150,
+      type: 'avatar',
+      imageUrl: 'avatar_gamer_girl',
+    },
+    {
+      name: 'أميرة السايبربانك (Cyber Princess)',
+      description: 'أفاتار مستقبلي بأضواء نيون بنفسجية وهالة تقنية ساحرة.',
+      price: 99999,
+      gemPrice: 85,
+      isGemOnly: true,
+      type: 'avatar',
+      imageUrl: 'avatar_cyber_girl',
+    },
+    {
+      name: 'بنت البلد الشقية',
+      description: 'أفاتار مصري أصيل بالطرحة الملونة وضحكة شقية خفيفة الدم.',
+      price: 90,
+      type: 'avatar',
+      imageUrl: 'avatar_bent_el_balad',
+    },
+    {
+      name: 'البدوية الأسطورية',
+      description: 'أفاتار بدوية أسطورية من صحراء سيناء بالبرقع الفضي والعيون الكحلية.',
+      price: 160,
+      type: 'avatar',
+      imageUrl: 'avatar_bedouin_girl',
     },
 
     {

@@ -16,6 +16,9 @@ const gameHistorySchema = new mongoose.Schema({
   totalRounds: { type: Number, default: 0 },
   categories: [{ type: String }],
   playedAt: { type: Date, default: Date.now },
+  // Users who already opened the end-of-game reward chest for this match.
+  // Keeps the ad reward to one claim per player per game.
+  rewardClaimedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 });
 
 module.exports = mongoose.model('GameHistory', gameHistorySchema);

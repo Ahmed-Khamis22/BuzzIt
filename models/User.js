@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema({
   coins: { type: Number, default: 100 },
   gems: { type: Number, default: 0 },
   isAdmin: { type: Boolean, default: false },
+  isVerified: { type: Boolean, default: true },
   selectedTheme: { type: String, default: 'classic' },
   preferences: {
     showStats: { type: Boolean, default: true },
@@ -31,6 +32,26 @@ const userSchema = new mongoose.Schema({
   totalCorrect: { type: Number, default: 0 },
   totalWrong: { type: Number, default: 0 },
   lastSpinClaim: { type: Date, default: null },
+  // Daily login reward
+  lastDailyReward: { type: Date, default: null },
+  dailyStreak: { type: Number, default: 0 },
+  dailyDoubledAt: { type: Date, default: null },
+  // Rewarded-ad throttling
+  adRewardsToday: { type: Number, default: 0 },
+  lastAdRewardAt: { type: Date, default: null },
+  // Lifetime counter backing the "watch an ad" daily task — totalGames/
+  // totalWins/totalCorrect above already back the other daily tasks.
+  totalAdsWatched: { type: Number, default: 0 },
+  // Daily tasks reset by snapshotting the lifetime counters at the start of
+  // each day, so progress = lifetime - baseline. No cron job needed.
+  dailyTasksDate: { type: Date, default: null },
+  dailyTasksBaseline: {
+    ads: { type: Number, default: 0 },
+    games: { type: Number, default: 0 },
+    wins: { type: Number, default: 0 },
+    correct: { type: Number, default: 0 },
+  },
+  dailyTasksClaimed: [{ type: String }],
   createdAt: { type: Date, default: Date.now },
 });
 
