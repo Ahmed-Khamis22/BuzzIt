@@ -285,8 +285,17 @@ const AD_REWARDS = {
   gems: { field: 'gems', amount: 2 },
 };
 
-// Daily ceiling so a scripted client can't farm this endpoint forever.
-const AD_REWARD_DAILY_CAP = 30;
+// A flat daily count let someone claim right before midnight and again right
+// after — two payouts minutes apart. A cooldown since the *last* claim closes
+// that gap and doubles as the throttle: 6h means at most 4 a day, spread out,
+// not all of them the moment the day resets.
+const AD_REWARD_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+
+function formatWait(ms) {
+  const minutes = Math.ceil(ms / 60000);
+  if (minutes < 60) return `${minutes} دقيقة`;
+  return `${Math.ceil(minutes / 60)} ساعة`;
+}
 
 router.post('/claim-ad-reward', auth, async (req, res) => {
   try {
@@ -297,24 +306,22 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    // Checked before spending the ad view — a player who's still on cooldown
+    // shouldn't lose the verified view; it stays unspent for their next claim.
+    if (user.lastAdRewardAt) {
+      const remaining = AD_REWARD_COOLDOWN_MS - (Date.now() - new Date(user.lastAdRewardAt).getTime());
+      if (remaining > 0) {
+        return res.status(429).json({ error: `لازم تستنى ${formatWait(remaining)} قبل مكافأة الإعلان الجاية.` });
+      }
+    }
+
     // Spend a Google-verified ad view. Before this existed, anyone holding
-    // their own token could POST here on a loop and collect the daily cap
+    // their own token could POST here on a loop and collect the reward
     // without ever loading an ad.
     const view = await consumeAdView(req.userId, `claim-ad-reward:${rewardType}`);
     if (!view.ok) return res.status(402).json({ error: view.error });
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const lastAt = user.lastAdRewardAt ? new Date(user.lastAdRewardAt) : null;
-    const sameDay = lastAt && lastAt >= today;
-    const usedToday = sameDay ? (user.adRewardsToday || 0) : 0;
-
-    if (usedToday >= AD_REWARD_DAILY_CAP) {
-      return res.status(429).json({ error: 'وصلت للحد الأقصى من مكافآت الإعلانات اليوم. عد غداً.' });
-    }
-
     user[reward.field] += reward.amount;
-    user.adRewardsToday = usedToday + 1;
     user.lastAdRewardAt = new Date();
     user.totalAdsWatched = (user.totalAdsWatched || 0) + 1;
     await user.save();
@@ -324,7 +331,7 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
       field: reward.field,
       coins: user.coins,
       gems: user.gems,
-      remainingToday: AD_REWARD_DAILY_CAP - user.adRewardsToday,
+      nextRewardAt: new Date(user.lastAdRewardAt.getTime() + AD_REWARD_COOLDOWN_MS),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

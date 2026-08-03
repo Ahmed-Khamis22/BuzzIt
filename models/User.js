@@ -41,8 +41,10 @@ const userSchema = new mongoose.Schema({
   lastDailyReward: { type: Date, default: null },
   dailyStreak: { type: Number, default: 0 },
   dailyDoubledAt: { type: Date, default: null },
-  // Rewarded-ad throttling
-  adRewardsToday: { type: Number, default: 0 },
+  // Rewarded-ad throttling: a fixed cooldown since the last claim, checked
+  // against AD_REWARD_COOLDOWN_MS in routes/users.js. Replaces a calendar-day
+  // counter that let a player claim right before *and* right after midnight —
+  // two claims a few minutes apart.
   lastAdRewardAt: { type: Date, default: null },
   // Lifetime counter backing the "watch an ad" daily task — totalGames/
   // totalWins/totalCorrect above already back the other daily tasks.
