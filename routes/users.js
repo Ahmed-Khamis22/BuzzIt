@@ -285,11 +285,11 @@ const AD_REWARDS = {
   gems: { field: 'gems', amount: 2 },
 };
 
-// A flat daily count let someone claim right before midnight and again right
-// after — two payouts minutes apart. A cooldown since the *last* claim closes
-// that gap and doubles as the throttle: 6h means at most 4 a day, spread out,
-// not all of them the moment the day resets.
-const AD_REWARD_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+// Each reward type gets its own clock: watching an ad for coins doesn't use up
+// your gems cooldown. 12h works out to twice a day per button — spread across
+// the day rather than a calendar-day count a player could empty right before
+// midnight and again right after, minutes apart.
+const AD_REWARD_COOLDOWN_MS = 12 * 60 * 60 * 1000;
 
 function formatWait(ms) {
   const minutes = Math.ceil(ms / 60000);
@@ -308,10 +308,11 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
 
     // Checked before spending the ad view — a player who's still on cooldown
     // shouldn't lose the verified view; it stays unspent for their next claim.
-    if (user.lastAdRewardAt) {
-      const remaining = AD_REWARD_COOLDOWN_MS - (Date.now() - new Date(user.lastAdRewardAt).getTime());
+    const lastAt = user.lastAdRewardAtByType?.get(rewardType);
+    if (lastAt) {
+      const remaining = AD_REWARD_COOLDOWN_MS - (Date.now() - new Date(lastAt).getTime());
       if (remaining > 0) {
-        return res.status(429).json({ error: `لازم تستنى ${formatWait(remaining)} قبل مكافأة الإعلان الجاية.` });
+        return res.status(429).json({ error: `لازم تستنى ${formatWait(remaining)} قبل مكافأة الإعلان دي تاني.` });
       }
     }
 
@@ -322,7 +323,10 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
     if (!view.ok) return res.status(402).json({ error: view.error });
 
     user[reward.field] += reward.amount;
-    user.lastAdRewardAt = new Date();
+    const claimedAt = new Date();
+    if (!user.lastAdRewardAtByType) user.lastAdRewardAtByType = new Map();
+    user.lastAdRewardAtByType.set(rewardType, claimedAt);
+    user.markModified('lastAdRewardAtByType'); // belt-and-suspenders for Mongoose Map change detection
     user.totalAdsWatched = (user.totalAdsWatched || 0) + 1;
     await user.save();
 
@@ -331,7 +335,7 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
       field: reward.field,
       coins: user.coins,
       gems: user.gems,
-      nextRewardAt: new Date(user.lastAdRewardAt.getTime() + AD_REWARD_COOLDOWN_MS),
+      nextRewardAt: new Date(claimedAt.getTime() + AD_REWARD_COOLDOWN_MS),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
