@@ -32,6 +32,11 @@ const userSchema = new mongoose.Schema({
   totalCorrect: { type: Number, default: 0 },
   totalWrong: { type: Number, default: 0 },
   lastSpinClaim: { type: Date, default: null },
+  // Wheel spins bought with a rewarded ad. The client used to unlock the spin
+  // button on its own, which the server then refused — the ad paid nothing.
+  // Reset by extraSpinsDate rather than a cron, same trick as daily tasks.
+  extraSpins: { type: Number, default: 0 },
+  extraSpinsDate: { type: Date, default: null },
   // Daily login reward
   lastDailyReward: { type: Date, default: null },
   dailyStreak: { type: Number, default: 0 },

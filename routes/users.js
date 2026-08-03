@@ -3,8 +3,25 @@ const User = require('../models/User');
 const GameHistory = require('../models/GameHistory');
 const auth = require('../middleware/auth');
 const { TASKS: DAILY_TASKS, resetDailyTasksIfStale, getDailyTasksState } = require('../services/dailyTasks');
+const { consumeAdView } = require('../services/adRewards');
 
 const router = express.Router();
+
+function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// Extra spins expire overnight. Reading them through this rather than off the
+// document means a stale count from yesterday is never spendable, with no
+// cleanup job to run.
+function availableExtraSpins(user) {
+  if (!user.extraSpinsDate) return 0;
+  const stored = new Date(user.extraSpinsDate);
+  stored.setHours(0, 0, 0, 0);
+  return stored.getTime() === startOfToday().getTime() ? user.extraSpins || 0 : 0;
+}
 
 router.get('/leaderboard', async (req, res) => {
   try {
@@ -201,6 +218,17 @@ router.post('/daily-tasks/watch-ad', auth, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
     resetDailyTasksIfStale(user);
 
+    // The task needs one ad. Anything past that is a client bug or someone
+    // poking the endpoint — either way there's nothing left to award, so stop
+    // inflating the lifetime counter that daily progress is derived from.
+    const adsTask = getDailyTasksState(user).find((t) => t.id === 'watch_ad');
+    if (adsTask?.completed) {
+      return res.json({ tasks: getDailyTasksState(user) });
+    }
+
+    const view = await consumeAdView(req.userId, 'daily-task-ad');
+    if (!view.ok) return res.status(402).json({ error: view.error });
+
     user.totalAdsWatched = (user.totalAdsWatched || 0) + 1;
     await user.save();
 
@@ -268,6 +296,12 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
 
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Spend a Google-verified ad view. Before this existed, anyone holding
+    // their own token could POST here on a loop and collect the daily cap
+    // without ever loading an ad.
+    const view = await consumeAdView(req.userId, `claim-ad-reward:${rewardType}`);
+    if (!view.ok) return res.status(402).json({ error: view.error });
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -414,6 +448,33 @@ router.post('/exchange-gems-for-coins', auth, async (req, res) => {
   }
 });
 
+// Bought with a rewarded ad. The app used to just flip a local flag and let the
+// player spin, which /spin-wheel then rejected — a full ad watched for nothing.
+const EXTRA_SPINS_DAILY_CAP = 3;
+
+router.post('/grant-extra-spin', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const current = availableExtraSpins(user);
+    if (current >= EXTRA_SPINS_DAILY_CAP) {
+      return res.status(429).json({ error: 'وصلت للحد الأقصى من اللفات الإضافية اليوم. عد غداً.' });
+    }
+
+    const view = await consumeAdView(req.userId, 'extra-spin');
+    if (!view.ok) return res.status(402).json({ error: view.error });
+
+    user.extraSpins = current + 1;
+    user.extraSpinsDate = startOfToday();
+    await user.save();
+
+    res.json({ extraSpins: user.extraSpins });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/spin-wheel', auth, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
@@ -425,12 +486,18 @@ router.post('/spin-wheel', auth, async (req, res) => {
     // Once-a-day limit. Without it the wheel is unlimited free coins, and the
     // "watch an ad for an extra spin" offer is worthless.
     // Set ALLOW_UNLIMITED_SPIN=true in .env to bypass while testing.
+    let spendingExtraSpin = false;
     if (process.env.ALLOW_UNLIMITED_SPIN !== 'true' && user.lastSpinClaim) {
       const lastClaim = new Date(user.lastSpinClaim);
       lastClaim.setHours(0, 0, 0, 0);
 
       if (lastClaim.getTime() === today.getTime()) {
-        return res.status(400).json({ error: 'لقد قمت بلف عجلة الحظ اليوم بالفعل! عد غداً.' });
+        // Already had the free spin — an ad-bought one is the only way through.
+        if (availableExtraSpins(user) > 0) {
+          spendingExtraSpin = true;
+        } else {
+          return res.status(400).json({ error: 'لقد قمت بلف عجلة الحظ اليوم بالفعل! عد غداً.' });
+        }
       }
     }
 
@@ -470,14 +537,22 @@ router.post('/spin-wheel', auth, async (req, res) => {
     }
 
     user.coins += selectedReward;
-    user.lastSpinClaim = new Date();
+    if (spendingExtraSpin) {
+      // Don't move lastSpinClaim — the free spin is already used up for today
+      // and overwriting it would hand out a second free one tomorrow morning.
+      user.extraSpins = availableExtraSpins(user) - 1;
+      user.extraSpinsDate = startOfToday();
+    } else {
+      user.lastSpinClaim = new Date();
+    }
     await user.save();
 
     res.json({
       success: true,
       reward: selectedReward,
       coins: user.coins,
-      lastSpinClaim: user.lastSpinClaim
+      lastSpinClaim: user.lastSpinClaim,
+      extraSpins: availableExtraSpins(user),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

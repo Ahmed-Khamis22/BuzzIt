@@ -20,6 +20,7 @@ const gameRoutes = require('./routes/game');
 const feedbackRoutes = require('./routes/feedback');
 const purchasesRoutes = require('./routes/purchases');
 const adminRoutes = require('./routes/admin');
+const adsRoutes = require('./routes/ads');
 const Question = require('./models/Question');
 const User = require('./models/User');
 
@@ -45,6 +46,12 @@ const apiLimiter = rateLimit({
   keyGenerator: clientIpKey,
   message: { error: 'تم تجاوز الحد الأقصى للطلبات. الرجاء المحاولة بعد 15 دقيقة.' }
 });
+// Mounted above the limiter on purpose. Every AdMob callback arrives from
+// Google's own addresses, so they'd all share one bucket and start getting 429s
+// under load — and a dropped callback is a player who watched an ad for
+// nothing. The signature check in the route is what protects it.
+app.use('/api/ads', adsRoutes);
+
 app.use('/api/', apiLimiter);
 
 app.use('/api/auth', authRoutes);
