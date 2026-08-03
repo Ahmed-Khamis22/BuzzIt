@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Otp = require('../models/Otp');
 const auth = require('../middleware/auth');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService');
+const { emailKey } = require('../middleware/rateLimitKey');
 
 const router = express.Router();
 
@@ -13,27 +14,34 @@ function signToken(userId) {
 }
 
 // Rate Limiters
+// All four key on the email in the body rather than the IP: carrier NAT puts
+// large numbers of unrelated users behind one address, and an IP bucket here
+// means one person's retries lock everyone else out of signing up.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
+  limit: 20, // per account — enough for a forgetful user, not for brute force
+  keyGenerator: emailKey,
   message: { error: 'تم تجاوز الحد الأقصى لمحاولات تسجيل الدخول، يرجى المحاولة بعد 15 دقيقة.' }
 });
 
 const registerLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, 
+  limit: 10,
+  keyGenerator: emailKey,
   message: { error: 'تم تجاوز الحد الأقصى لمحاولات التسجيل، يرجى المحاولة لاحقاً.' }
 });
 
 const otpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3, // Only 3 OTP requests per 15 mins
+  limit: 5, // resends per email — each one costs us an outbound Gmail send
+  keyGenerator: emailKey,
   message: { error: 'تم تجاوز الحد الأقصى لطلب الأكواد، يرجى المحاولة بعد 15 دقيقة.' }
 });
 
 const verifyLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Max 5 verification attempts per 15 mins to prevent brute-force
+  limit: 10, // wrong-code attempts per email, still far below 10^6 guesses
+  keyGenerator: emailKey,
   message: { error: 'تم تجاوز الحد الأقصى لمحاولات إدخال الكود، يرجى المحاولة بعد 15 دقيقة.' }
 });
 
@@ -66,24 +74,40 @@ router.post('/register', registerLimiter, async (req, res) => {
     }
 
     const existing = await User.findOne({ $or: [{ email: normalizedEmail }, { username }] });
-    if (existing) {
-      if (existing.email === normalizedEmail) {
-        return res.status(409).json({ error: 'البريد الإلكتروني مستخدم بالفعل' });
-      }
+    if (existing && existing.email !== normalizedEmail) {
       return res.status(409).json({ error: 'اسم المستخدم مستخدم بالفعل' });
     }
+    // An unverified row is a signup that never finished — the address was
+    // never proven to belong to anyone, so let them start over instead of
+    // hitting "email already taken" on an account they can't get into.
+    if (existing && existing.isVerified) {
+      return res.status(409).json({ error: 'البريد الإلكتروني مستخدم بالفعل' });
+    }
 
-    const isAdmin = username.toLowerCase().includes('admin') || normalizedEmail.includes('admin');
-    
-    // Create unverified user
-    const user = await User.create({ username, email: normalizedEmail, password, isAdmin, isVerified: false });
-    
+    let user;
+    if (existing) {
+      existing.username = username;
+      existing.password = password; // pre('save') re-hashes it
+      await existing.save();
+      user = existing;
+    } else {
+      user = await User.create({ username, email: normalizedEmail, password, isVerified: false });
+    }
+
     // Generate OTP
+    await Otp.deleteMany({ email: normalizedEmail, purpose: 'verify_email' });
     const otpCode = Otp.generateOTP();
     await Otp.create({ email: normalizedEmail, otp: otpCode, purpose: 'verify_email' });
-    
-    // Send Email
-    await sendVerificationEmail(normalizedEmail, otpCode);
+
+    // Send Email. sendEmail swallows its errors and reports false, so check it
+    // — otherwise the account sits here unverified with no code on its way and
+    // the user has no way to ask for another one.
+    const sent = await sendVerificationEmail(normalizedEmail, otpCode);
+    if (!sent) {
+      if (!existing) await User.deleteOne({ _id: user._id });
+      await Otp.deleteMany({ email: normalizedEmail, purpose: 'verify_email' });
+      return res.status(502).json({ error: 'تعذّر إرسال كود التفعيل الآن، يرجى المحاولة بعد قليل.' });
+    }
 
     res.status(201).json({
       message: 'Verification required',

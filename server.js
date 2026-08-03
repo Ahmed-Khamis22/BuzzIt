@@ -11,6 +11,7 @@ const { saveGameResults } = require('./services/gameService');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
 const rateLimit = require('express-rate-limit');
+const { clientIpKey } = require('./middleware/rateLimitKey');
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const questionsRoutes = require('./routes/questions');
@@ -25,6 +26,13 @@ const User = require('./models/User');
 connectDB();
 
 const app = express();
+
+// Cloudflare -> Render's load balancer -> here. Without this, req.ip is the
+// proxy's address for every request, so all the rate limiters below share one
+// bucket across the entire user base. A hop count (not `true`) so a client
+// can't prepend its own X-Forwarded-For and pick its own key.
+app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 2));
+
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
@@ -33,7 +41,8 @@ app.use(mongoSanitize());
 // Global API rate limiter (prevents spam and brute force)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // limit each IP to 500 requests per window
+  limit: 1000, // per client IP — an active match burns through requests fast
+  keyGenerator: clientIpKey,
   message: { error: 'تم تجاوز الحد الأقصى للطلبات. الرجاء المحاولة بعد 15 دقيقة.' }
 });
 app.use('/api/', apiLimiter);
