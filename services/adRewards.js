@@ -21,7 +21,7 @@ async function takeVerification(userId) {
   return AdVerification.findOneAndUpdate(
     { userId, consumedAt: null },
     { $set: { consumedAt: new Date() } },
-    { sort: { createdAt: -1 }, new: true }
+    { sort: { createdAt: -1 }, returnDocument: 'after' }
   );
 }
 
