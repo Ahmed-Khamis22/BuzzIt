@@ -57,7 +57,9 @@ const isValidPassword = (password) => {
 
 router.post('/register', registerLimiter, async (req, res) => {
   try {
-    console.log('[BACKEND] Received /register request with body:', req.body);
+    // Never log req.body here — it carries the plaintext password, and this
+    // line was writing it straight into Render's logs for every signup.
+    console.log('[BACKEND] Received /register request for:', req.body?.username, req.body?.email);
     const { username, email, password } = req.body;
     if (!username || !email || !password) {
       return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
