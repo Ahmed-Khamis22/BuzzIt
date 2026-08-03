@@ -1,24 +1,37 @@
-const nodemailer = require('nodemailer');
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+// Render blocks (or Gmail throttles from Render's shared IP range — either
+// way, the result is the same) outbound SMTP: connections to Gmail on 465
+// failed with ENETUNREACH over IPv6 and ETIMEDOUT over IPv4, so no amount of
+// DNS-order tweaking fixes it. Resend sends over a plain HTTPS POST instead,
+// which egresses fine from anywhere a normal API call would.
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+// Resend's shared sending domain — works immediately with no DNS setup.
+// Switch to a verified custom domain later for better inbox placement.
+const FROM_ADDRESS = process.env.EMAIL_FROM || 'BuzzIt <onboarding@resend.dev>';
 
 const sendEmail = async (to, subject, htmlContent) => {
-  try {
-    const mailOptions = {
-      from: `"BuzzIt App" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      html: htmlContent
-    };
+  if (!RESEND_API_KEY) {
+    console.error('[EmailService] RESEND_API_KEY is not set — cannot send email');
+    return false;
+  }
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`[EmailService] Email sent successfully to ${to}. Message ID: ${info.messageId}`);
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from: FROM_ADDRESS, to: [to], subject, html: htmlContent }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error(`[EmailService] Resend rejected the send (${res.status}): ${body}`);
+      return false;
+    }
+
+    const data = await res.json();
+    console.log(`[EmailService] Email sent successfully to ${to}. Message ID: ${data.id}`);
     return true;
   } catch (error) {
     console.error(`[EmailService] Failed to send email to ${to}:`, error);
