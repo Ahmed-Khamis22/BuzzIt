@@ -1,4 +1,11 @@
 require('dotenv').config();
+
+// Render's network resolves Gmail's SMTP host to an IPv6 address it then
+// can't route to (ENETUNREACH), silently failing every OTP/reset email that
+// hits it. Node 17+ can prefer IPv4 results outright — the officially
+// documented fix for exactly this class of failure in containerized hosts.
+require('dns').setDefaultResultOrder('ipv4first');
+
 // Explicit opt-in only — must be set to 'true' in a LOCAL .env file (never on the deployed server)
 // so solo-testing can never accidentally activate in production.
 const ALLOW_SOLO_TEST = process.env.ALLOW_SOLO_TEST === 'true';
@@ -2242,7 +2249,11 @@ function normalizeArabic(text) {
         room.hostDisconnected = true;
         io.to(code).emit('host-disconnected');
 
-        // Give the host 20 seconds to return
+        // Render's free tier sleeps after 15 idle minutes and takes up to ~50s
+        // to wake — a host backgrounding the app (e.g. to check WhatsApp) could
+        // hit that cold start on the way back. 20s used to expire the room
+        // before reconnection even finished; 75s comfortably outlasts the
+        // worst-case wake time plus the socket handshake after it.
         room.hostTimeout = setTimeout(() => {
           if (rooms[code] && rooms[code].hostDisconnected) {
             const migrated = migrateHost(code);
@@ -2261,7 +2272,7 @@ function normalizeArabic(text) {
             }
             io.emit('public-rooms-update', getPublicRooms());
           }
-        }, 20000); // 20 seconds
+        }, 75000); // 75 seconds
 
         publicRoomsChanged = true;
       }
