@@ -809,13 +809,13 @@
     "difficulty": "medium"
   },
   {
-    "text": "ما هي الدولة الأفريقية الوحيدة التي لم تُستعمر قط؟",
+    "text": "إيه الدولة الأفريقية اللي احتلتها إيطاليا من سنة 1936 لـ1941؟",
     "category": "general-knowledge",
     "answer": "إثيوبيا",
     "difficulty": "medium"
   },
   {
-    "text": "ما هو البحر الأكثر ملوحة في العالم؟",
+    "text": "إيه اسم المسطح المائي المشهور بملوحته العالية جدًا؟",
     "category": "general-knowledge",
     "answer": "البحر الميت",
     "difficulty": "medium"
@@ -833,7 +833,7 @@
     "difficulty": "medium"
   },
   {
-    "text": "ما هو أطول نهر في العالم؟",
+    "text": "إيه أطول نهر في أفريقيا؟",
     "category": "general-knowledge",
     "answer": "نهر النيل",
     "difficulty": "medium"
@@ -851,7 +851,7 @@
     "difficulty": "medium"
   },
   {
-    "text": "ما هي أكبر صحراء في العالم؟",
+    "text": "إيه أكبر صحراء حارة في العالم؟",
     "category": "general-knowledge",
     "answer": "الصحراء الكبرى",
     "difficulty": "medium"
@@ -959,13 +959,13 @@
     "difficulty": "medium"
   },
   {
-    "text": "من هو مكتشف الجاذبية الأرضية؟",
+    "text": "مين العالم اللي ارتبط اسمه باكتشاف الجاذبية؟",
     "category": "general-knowledge",
     "answer": "إسحاق نيوتن",
     "difficulty": "medium"
   },
   {
-    "text": "ما هو الاسم العلمي للماء؟",
+    "text": "إيه الرمز الكيميائي للمياه؟",
     "category": "general-knowledge",
     "answer": "H2O",
     "difficulty": "medium"
@@ -995,7 +995,7 @@
     "difficulty": "medium"
   },
   {
-    "text": "ما هو أطول جبل في العالم؟",
+    "text": "إيه أعلى جبل في العالم فوق سطح البحر؟",
     "category": "general-knowledge",
     "answer": "إفرست",
     "difficulty": "medium"
@@ -1007,9 +1007,9 @@
     "difficulty": "medium"
   },
   {
-    "text": "ما هو العضو المسؤول عن تصفية الدم في جسم الإنسان؟",
+    "text": "إيه العضوين اللي بينقّوا الدم وبيكوّنوا البول في جسم الإنسان؟",
     "category": "general-knowledge",
-    "answer": "الكلية",
+    "answer": "الكليتان",
     "difficulty": "medium"
   },
   {
@@ -1151,9 +1151,9 @@
     "difficulty": "medium"
   },
   {
-    "text": "مين بطلة فيلم 'اللمبي'؟",
+    "text": "مين جسدت شخصية نوسة في فيلم 'اللمبي'؟",
     "category": "egyptian-movies",
-    "answer": "عبلة كامل",
+    "answer": "حلا شيحة",
     "difficulty": "medium"
   },
   {
@@ -1163,7 +1163,7 @@
     "difficulty": "medium"
   },
   {
-    "text": "مين بطل فيلم 'سهر الليالي'؟",
+    "text": "مين جسد شخصية سامح في فيلم 'سهر الليالي'؟",
     "category": "egyptian-movies",
     "answer": "شريف منير",
     "difficulty": "medium"
@@ -1205,7 +1205,7 @@
     "difficulty": "medium"
   },
   {
-    "text": "بطلة فيلم 'صعيدي في الجامعة الأمريكية' بجانب هنيدي؟",
+    "text": "مين جسدت شخصية سيادة في فيلم 'صعيدي في الجامعة الأمريكية'؟",
     "category": "egyptian-movies",
     "answer": "منى زكي",
     "difficulty": "medium"

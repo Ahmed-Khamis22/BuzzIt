@@ -4,7 +4,7 @@ const Question = require('./models/Question');
 
 const triviaQuestions = [
   // General Knowledge (Trivia)
-  { text: "ما هو أطول نهر في العالم؟", answer: "نهر النيل", choices: ["نهر الأمازون", "نهر النيل", "نهر المسيسيبي", "نهر الفرات"], category: "general-knowledge", difficulty: "easy", isCustomTrivia: true },
+  { text: "إيه أطول نهر في أفريقيا؟", answer: "نهر النيل", choices: ["نهر الأمازون", "نهر النيل", "نهر المسيسيبي", "نهر الفرات"], category: "general-knowledge", difficulty: "easy", isCustomTrivia: true },
   { text: "ما هي عاصمة اليابان؟", answer: "طوكيو", choices: ["بكين", "سيول", "طوكيو", "بانكوك"], category: "general-knowledge", difficulty: "easy", isCustomTrivia: true },
   { text: "من هو مخترع المصباح الكهربائي؟", answer: "توماس إديسون", choices: ["ألبرت أينشتاين", "نيكولا تسلا", "توماس إديسون", "ألكسندر جراهام بيل"], category: "general-knowledge", difficulty: "medium", isCustomTrivia: true },
   { text: "كم عدد الكواكب في المجموعة الشمسية؟", answer: "8", choices: ["7", "8", "9", "10"], category: "general-knowledge", difficulty: "easy", isCustomTrivia: true },
@@ -21,7 +21,7 @@ const triviaQuestions = [
   { text: "من هو بطل فيلم 'غبي منه فيه'؟", answer: "هاني رمزي", choices: ["أحمد حلمي", "محمد سعد", "هاني رمزي", "أحمد مكي"], category: "egyptian-movies", difficulty: "easy", isCustomTrivia: true },
   { text: "في فيلم 'صعيدي في الجامعة الأمريكية'، ما هو اسم الشخصية التي جسدها محمد هنيدي؟", answer: "خلف الدهشوري", choices: ["عاطف", "خلف الدهشوري", "سعيد", "علي"], category: "egyptian-movies", difficulty: "medium", isCustomTrivia: true },
   { text: "مين بطل مسلسل 'الكبير أوي'؟", answer: "أحمد مكي", choices: ["أحمد عز", "أحمد حلمي", "أحمد السقا", "أحمد مكي"], category: "egyptian-movies", difficulty: "easy", isCustomTrivia: true },
-  { text: "في فيلم 'فول الصين العظيم'، محي الشرقاوي سافر فين؟", answer: "الصين", choices: ["اليابان", "الصين", "كوريا", "تايلاند"], category: "egyptian-movies", difficulty: "easy", isCustomTrivia: true },
+  { text: "إيه اسم الشخصية اللي جسدها محمد هنيدي في فيلم 'فول الصين العظيم'؟", answer: "محي الشرقاوي", choices: ["محي الشرقاوي", "خلف الدهشوري", "همام", "ممس"], category: "egyptian-movies", difficulty: "easy", isCustomTrivia: true },
   { text: "اسم بطل فيلم 'اللمبي' الحقيقي هو؟", answer: "محمد سعد", choices: ["أحمد سعد", "محمد سعد", "سعد الصغير", "حسن حسني"], category: "egyptian-movies", difficulty: "easy", isCustomTrivia: true },
   
   // Word in Song (Trivia)
@@ -37,7 +37,7 @@ const triviaQuestions = [
 
 const buzzerQuestions = [
   // General Knowledge (Buzzer)
-  { text: "ما هو أطول نهر في العالم؟", answer: "نهر النيل", category: "general-knowledge", difficulty: "easy", isCustomTrivia: false },
+  { text: "إيه أطول نهر في أفريقيا؟", answer: "نهر النيل", category: "general-knowledge", difficulty: "easy", isCustomTrivia: false },
   { text: "ما هي عاصمة اليابان؟", answer: "طوكيو", category: "general-knowledge", difficulty: "easy", isCustomTrivia: false },
   { text: "من هو مخترع المصباح الكهربائي؟", answer: "توماس إديسون", category: "general-knowledge", difficulty: "medium", isCustomTrivia: false },
   { text: "كم عدد الكواكب في المجموعة الشمسية؟", answer: "8", category: "general-knowledge", difficulty: "easy", isCustomTrivia: false },
@@ -56,7 +56,7 @@ const buzzerQuestions = [
   { text: "مين بطل مسلسل 'الكبير أوي'؟", answer: "أحمد مكي", category: "egyptian-movies", difficulty: "easy", isCustomTrivia: false },
   { text: "اسم بطل فيلم 'اللمبي' الحقيقي هو؟", answer: "محمد سعد", category: "egyptian-movies", difficulty: "easy", isCustomTrivia: false },
   { text: "فيلم مصري كوميدي بطولته أحمد حلمي، يجسد فيه دور 3 أخوات توأم؟", answer: "كده رضا", category: "egyptian-movies", difficulty: "easy", isCustomTrivia: false },
-  { text: "فيلم بطولته كريم عبد العزيز وماجد الكدواني، وتدور أحداثه عن نادي الرجال السري؟", answer: "نادي الرجال السري", category: "egyptian-movies", difficulty: "easy", isCustomTrivia: false },
+  { text: "مين بطل فيلم 'نادي الرجال السري'؟", answer: "كريم عبد العزيز", category: "egyptian-movies", difficulty: "easy", isCustomTrivia: false },
 
   // Word in Song (Buzzer)
   { text: "أكمل الأغنية: 'لولا الملامة يا هوى لولا الملامة...' لوردة الجزائرية", answer: "لفرد جناحي في الهوا", category: "word-in-song", difficulty: "hard", isCustomTrivia: false },

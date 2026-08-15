@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const Question = require('./models/Question');
 
 const hardQuestions = [
-  { text: "ما هي الدولة الوحيدة التي لا تملك جيشاً عسكرياً على الإطلاق وتعتمد على سويسرا في دفاعها؟", answer: "ليختنشتاين", choices: ["آيسلندا", "ليختنشتاين", "أندورا", "سان مارينو"], category: "general-knowledge", difficulty: "hard" },
+  { text: "إيه الدولة الأوروبية اللي ألغت جيشها سنة 1868؟", answer: "ليختنشتاين", choices: ["آيسلندا", "ليختنشتاين", "أندورا", "سان مارينو"], category: "general-knowledge", difficulty: "hard" },
   { text: "ما هو الكوكب الوحيد في النظام الشمسي الذي يدور على جانبه؟", answer: "أورانوس", choices: ["المريخ", "المشتري", "أورانوس", "الزهرة"], category: "general-knowledge", difficulty: "hard" },
   { text: "من هو العالم الذي اكتشف البنسلين بالصدفة؟", answer: "ألكسندر فلمنج", choices: ["لويس باستير", "ماري كوري", "روبرت كوخ", "ألكسندر فلمنج"], category: "general-knowledge", difficulty: "hard" },
   { text: "ما هي أعمق نقطة في المحيطات على كوكب الأرض؟", answer: "خندق ماريانا", choices: ["خندق بورتوريكو", "البحر الميت", "خندق ماريانا", "خندق تونغا"], category: "general-knowledge", difficulty: "hard" },

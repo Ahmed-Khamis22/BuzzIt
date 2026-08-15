@@ -21,7 +21,7 @@ const questions = [
   { text: "فيلم 'إشاعة حب' من إخراج من؟", answer: "فطين عبد الوهاب", choices: ["عز الدين ذو الفقار", "حسن الإمام", "يوسف شاهين", "فطين عبد الوهاب"], category: "egyptian-movies", difficulty: "hard" },
   { text: "من هو الممثل الذي أدى دور 'رأفت الهجان'؟", answer: "محمود عبد العزيز", choices: ["نور الشريف", "عادل إمام", "محمود عبد العزيز", "يحيى الفخراني"], category: "egyptian-movies", difficulty: "easy" },
   { text: "من شارك أحمد حلمي بطولة فيلم 'آسف على الإزعاج'؟", answer: "منة شلبي", choices: ["منى زكي", "دنيا سمير غانم", "منة شلبي", "غادة عادل"], category: "egyptian-movies", difficulty: "medium" },
-  { text: "في أي فيلم ظهرت شخصية 'اللمبي' لأول مرة؟", answer: "الناظر", text: "الناظر", choices: ["اللمبي", "اللي بالي بالك", "الناظر", "عوكل"], category: "egyptian-movies", difficulty: "medium" },
+  { text: "في أي فيلم ظهرت شخصية 'اللمبي' لأول مرة؟", answer: "الناظر", choices: ["اللمبي", "اللي بالي بالك", "الناظر", "عوكل"], category: "egyptian-movies", difficulty: "medium" },
   { text: "من هي بطلة فيلم 'خلي بالك من زوزو'؟", answer: "سعاد حسني", choices: ["فاتن حمامة", "شادية", "سعاد حسني", "نادية لطفي"], category: "egyptian-movies", difficulty: "easy" },
   { text: "ما هو الفيلم المصري الوحيد الذي ترشح للقائمة القصيرة في الأوسكار؟", answer: "لا يوجد", choices: ["المهاجر", "دعاء الكروان", "باب الحديد", "لا يوجد"], category: "egyptian-movies", difficulty: "hard" },
   { text: "من قام بدور 'عاطف' في فيلم الناظر؟", answer: "أحمد حلمي", choices: ["محمد سعد", "أحمد حلمي", "علاء ولي الدين", "أحمد مكي"], category: "egyptian-movies", difficulty: "medium" },

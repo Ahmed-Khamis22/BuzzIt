@@ -30,10 +30,13 @@ const adminRoutes = require('./routes/admin');
 const adsRoutes = require('./routes/ads');
 const Question = require('./models/Question');
 const User = require('./models/User');
+const jwt = require('jsonwebtoken');
 const syncFlagQuestions = require('./services/flagQuestionSync');
+const syncQuestionCorrections = require('./services/questionCorrectionSync');
 
 connectDB()
   .then(syncFlagQuestions)
+  .then(syncQuestionCorrections)
   .catch((error) => console.error('Flag question sync failed:', error.message));
 
 const app = express();
@@ -98,6 +101,19 @@ const io = new Server(server);
 
 const rooms = {};
 const connectedUsers = new Map();
+
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) return next();
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.authUserId = String(decoded.userId);
+    socket.userId = socket.authUserId;
+  } catch {
+    socket.authUserId = null;
+  }
+  next();
+});
 
 function generateRoomCode() {
   return Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -671,7 +687,9 @@ async function fetchOneQuestion(room) {
 
   if (count === 0 && room.usedQuestions.length > 0) {
     logDebug(`[Question Pool] All questions used. Resetting pool.`);
-    room.usedQuestions = [];
+    // Keep the question history when the same room plays again. The selector
+    // resets it automatically only after the available pool is exhausted.
+    room.usedQuestions = room.usedQuestions || [];
     delete matchStage._id;
     count = await Question.countDocuments(matchStage);
   }
@@ -978,6 +996,19 @@ async function applyPoint(code, playerId, points) {
 
 io.on('connection', (socket) => {
 
+  socket.on('authenticate', (token, acknowledge = () => {}) => {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      socket.authUserId = String(decoded.userId);
+      socket.userId = socket.authUserId;
+      connectedUsers.set(socket.authUserId, socket.id);
+      acknowledge({ authenticated: true, userId: socket.authUserId });
+    } catch {
+      socket.authUserId = null;
+      acknowledge({ authenticated: false });
+    }
+  });
+
   // مزامنة الوقت
   socket.on('sync-time', (clientTime) => {
     socket.emit('sync-time-response', { clientTime, serverTime: Date.now() });
@@ -985,28 +1016,34 @@ io.on('connection', (socket) => {
 
   // تسجيل المستخدم للإشعارات (دعوات الأصدقاء)
   socket.on('register-user', (userId) => {
-    if (userId) {
-      connectedUsers.set(userId, socket.id);
-      socket.userId = userId;
+    if (socket.authUserId && String(userId) === socket.authUserId) {
+      connectedUsers.set(socket.authUserId, socket.id);
+      socket.userId = socket.authUserId;
     }
   });
 
   // إرسال دعوة غرفة
   socket.on('send-room-invite', ({ targetUserId, roomCode, hostName }) => {
+    const room = rooms[roomCode];
+    if (!socket.authUserId || !room || !room.players[socket.id]) return;
     const targetSocketId = connectedUsers.get(targetUserId);
     if (targetSocketId) {
-      io.to(targetSocketId).emit('receive-room-invite', { roomCode, hostName });
+      io.to(targetSocketId).emit('receive-room-invite', {
+        roomCode,
+        hostName: room.players[socket.id]?.name || room.hostName || hostName,
+      });
     }
   });
 
   // حكم بيعمل روم
   socket.on('create-room', (payload) => {
     const { hostName, hostUserId, hostEquippedItems, config } = payload || {};
+    const verifiedHostUserId = socket.authUserId || null;
     const code = generateRoomCode();
     rooms[code] = {
       host: socket.id,
       hostName: hostName || 'Unknown Host',
-      hostUserId: hostUserId || null,
+      hostUserId: verifiedHostUserId,
       hostEquippedItems: hostEquippedItems || null,
       status: 'LOBBY', // LOBBY, PLAYING, RESULTS
       config: config || {},
@@ -1026,7 +1063,7 @@ io.on('connection', (socket) => {
 
     const isPlayingHost = config?.gameMode === 'trivia' || config?.gameMode === 'draw' || (config?.gameMode === 'buzzer' && config?.answerMode === 'written');
     if (isPlayingHost) {
-      rooms[code].players[socket.id] = { name: hostName || 'Unknown Host', userId: hostUserId || null, disconnected: false, equippedItems: hostEquippedItems || null };
+      rooms[code].players[socket.id] = { name: hostName || 'Unknown Host', userId: verifiedHostUserId, disconnected: false, equippedItems: hostEquippedItems || null };
       rooms[code].scores[socket.id] = 0;
       rooms[code].correct[socket.id] = 0;
       rooms[code].wrong[socket.id] = 0;
@@ -1067,11 +1104,12 @@ io.on('connection', (socket) => {
   socket.on('join-room', ({ code, playerName, userId, equippedItems }) => {
     const room = rooms[code];
     if (!room) return socket.emit('error', 'الروم مش موجود!');
+    const verifiedUserId = socket.authUserId || null;
     
     // Check for reconnecting player
     let reconnectingId = null;
     for (const [id, p] of Object.entries(room.players)) {
-      if ((userId && p.userId === userId) || (!userId && p.name === playerName)) {
+      if ((verifiedUserId && String(p.userId) === verifiedUserId) || (!verifiedUserId && !p.userId && p.name === playerName)) {
         reconnectingId = id;
         break;
       }
@@ -1122,6 +1160,10 @@ io.on('connection', (socket) => {
 
       if (room.buzzer === reconnectingId) room.buzzer = socket.id;
       if (room.drawerId === reconnectingId) room.drawerId = socket.id;
+      if (room.correctGuessers?.delete(reconnectingId)) room.correctGuessers.add(socket.id);
+      if (room.drawnPlayers) {
+        room.drawnPlayers = room.drawnPlayers.map((id) => id === reconnectingId ? socket.id : id);
+      }
 
       // Written mode remembers rejected/appealable answers by socket id — remap
       // them too, or a mid-question reconnect silently kills that player's appeal.
@@ -1157,7 +1199,7 @@ io.on('connection', (socket) => {
       io.to(code).emit('player-rejoined', {
         id: socket.id,
         name: playerName,
-        userId: userId || null,
+        userId: verifiedUserId,
         score: room.scores[socket.id],
         equippedItems: room.players[socket.id].equippedItems,
         cards: room.cards?.[socket.id] || { yellow: 0, red: 0 }
@@ -1204,7 +1246,7 @@ io.on('connection', (socket) => {
 
     if (room.status === 'RESULTS') return socket.emit('error', 'اللعبة انتهت!');
 
-    room.players[socket.id] = { name: playerName, userId: userId || null, disconnected: false, equippedItems };
+    room.players[socket.id] = { name: playerName, userId: verifiedUserId, disconnected: false, equippedItems };
     room.scores[socket.id] = 0;
     room.correct[socket.id] = 0;
     room.wrong[socket.id] = 0;
@@ -1223,7 +1265,7 @@ io.on('connection', (socket) => {
     }));
 
     socket.emit('joined-room', { code, playerName, players: playersList, status: room.status, config: room.config, hostId: room.host, judge: judgeInfo(room) });
-    io.to(code).emit('player-joined', { id: socket.id, name: playerName, userId: userId || null, score: 0, equippedItems, cards: { yellow: 0, red: 0 } });
+    io.to(code).emit('player-joined', { id: socket.id, name: playerName, userId: verifiedUserId, score: 0, equippedItems, cards: { yellow: 0, red: 0 } });
     io.emit('public-rooms-update', getPublicRooms());
 
     // Send current question state if joining mid-game
@@ -1991,6 +2033,9 @@ io.on('connection', (socket) => {
     const room = rooms[code];
     // Only the active drawer may draw — otherwise anyone can scribble over the round.
     if (!room || room.drawerId !== socket.id) return;
+    if (!stroke || typeof stroke.path !== 'string' || stroke.path.length > 50000) return;
+    if (stroke.color !== undefined && (typeof stroke.color !== 'string' || stroke.color.length > 20)) return;
+    if (stroke.width !== undefined && (!Number.isFinite(stroke.width) || stroke.width < 1 || stroke.width > 50)) return;
     
     // Drawer is active, clear AFK timer
     if (room.afkTimer) {
@@ -1999,6 +2044,7 @@ io.on('connection', (socket) => {
     }
 
     if (!room.drawStrokes) room.drawStrokes = [];
+    if (room.drawStrokes.length >= 2000) return;
     room.drawStrokes.push(stroke);
     socket.to(code).emit('draw-update', stroke);
   });
@@ -2008,6 +2054,13 @@ io.on('connection', (socket) => {
     const { code, stroke } = data;
     const room = rooms[code];
     if (!room || room.drawerId !== socket.id) return;
+    if (stroke !== null && (
+      !stroke ||
+      typeof stroke.path !== 'string' ||
+      stroke.path.length > 50000 ||
+      (stroke.color !== undefined && (typeof stroke.color !== 'string' || stroke.color.length > 20)) ||
+      (stroke.width !== undefined && (!Number.isFinite(stroke.width) || stroke.width < 1 || stroke.width > 50))
+    )) return;
     socket.to(code).emit('draw-update-live', stroke); // stroke is null to clear, or object to show
   });
 
@@ -2133,18 +2186,26 @@ function normalizeArabic(text) {
   return str;
 }
 
-  socket.on('draw-guess', (data) => {
+  socket.on('draw-guess', (data, acknowledge = () => {}) => {
     const { code, guess } = data;
     const playerId = socket.id;
     const room = rooms[code];
-    if (!room || room.status !== 'PLAYING' || room.config.gameMode !== 'draw') return;
+    if (!room || room.status !== 'PLAYING' || room.config.gameMode !== 'draw') {
+      return acknowledge({ accepted: false, message: 'الجولة مش متاحة دلوقتي.' });
+    }
     if (!room.correctGuessers) room.correctGuessers = new Set();
 
     // Drawer can't guess, already-correct players can't spam
-    if (socket.id === room.drawerId) return;
-    if (room.correctGuessers.has(playerId)) return;
+    if (socket.id === room.drawerId) return acknowledge({ accepted: false, message: 'الرسام ما ينفعش يخمّن.' });
+    if (room.correctGuessers.has(playerId)) return acknowledge({ accepted: false, message: 'إنت خمّنت الكلمة صح بالفعل.' });
     // Only actual competitors score, otherwise a spectator creates a phantom entry
-    if (!room.players[playerId]) return;
+    if (!room.players[playerId]) return acknowledge({ accepted: false, message: 'الاتصال بالغرفة لسه بيرجع.' });
+    if (typeof guess !== 'string' || !guess.trim()) {
+      return acknowledge({ accepted: false, message: 'اكتب تخمين الأول.' });
+    }
+    if (guess.length > 120) {
+      return acknowledge({ accepted: false, message: 'التخمين طويل زيادة.' });
+    }
 
     // Same forgiving comparison the buzzer mode uses, so a typo doesn't cost the
     // round — and worse, get broadcast to everyone as a near-miss they can copy.
@@ -2192,16 +2253,18 @@ function normalizeArabic(text) {
       if (allGuessed) {
         endDrawRound(code);
       }
+      acknowledge({ accepted: true, correct: true });
     } else {
       // Wrong guess → broadcast as normal chat
       room.wrong[playerId] = (room.wrong[playerId] || 0) + 1;
       io.to(code).emit('draw-chat', { playerId, guess });
+      acknowledge({ accepted: true, correct: false });
     }
   });
 
   // لاعب اتفصل
   socket.on('disconnect', () => {
-    if (socket.userId) {
+    if (socket.userId && connectedUsers.get(socket.userId) === socket.id) {
       connectedUsers.delete(socket.userId);
     }
 
@@ -2230,8 +2293,9 @@ function normalizeArabic(text) {
           checkSkip(code);
         }
 
-        // If this player was the drawer, end the round immediately
-        if (room.config?.gameMode === 'draw' && room.status === 'PLAYING' && room.drawerId === socket.id) {
+        // A backgrounded drawer can reconnect and restore the same round. The
+        // normal round timer remains responsible for ending an abandoned turn.
+        if (false && room.config?.gameMode === 'draw' && room.status === 'PLAYING' && room.drawerId === socket.id) {
           io.to(code).emit('draw-chat', {
             playerId: null,
             guess: `🚪 الراسم غادر اللعبة! الكلمة كانت: ${room.currentDrawWord}`,
@@ -2293,6 +2357,7 @@ function normalizeArabic(text) {
   socket.on('rejoin-host', (code) => {
     const room = rooms[code];
     if (room) {
+      if (room.hostUserId && String(room.hostUserId) !== socket.authUserId) return;
       if (room.hostTimeout) clearTimeout(room.hostTimeout);
 
       const previousHostId = room.host;
@@ -2388,6 +2453,26 @@ function normalizeArabic(text) {
           equippedItems: room.players[socket.id].equippedItems,
           cards: room.cards?.[socket.id] || { yellow: 0, red: 0 },
         });
+      }
+
+      // Drawing mode has no currentQuestion, so the generic host state above
+      // is not enough to rebuild the active round after Android resumes.
+      if (room.status === 'PLAYING' && room.config?.gameMode === 'draw') {
+        const timeElapsed = (Date.now() - (room.roundStartTime || Date.now())) / 1000;
+        const timeLimit = room.config.timeLimit || 60;
+        const timeLeft = Math.max(0, Math.ceil(timeLimit - timeElapsed));
+        const maskedWord = room.currentDrawWord
+          ? room.currentDrawWord.split('').map((c) => c === ' ' ? ' ' : '_').join(' ')
+          : '';
+        socket.emit('draw-round-start', {
+          drawerId: room.drawerId,
+          wordLength: room.currentDrawWord?.length || 0,
+          maskedWord,
+          timeLimit,
+          timeLeft,
+        });
+        if (socket.id === room.drawerId) socket.emit('draw-word', { word: room.currentDrawWord });
+        socket.emit('draw-sync-canvas', room.drawStrokes || []);
       }
 
       io.to(code).emit('host-rejoined');
