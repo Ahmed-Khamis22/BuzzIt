@@ -7,10 +7,17 @@ const { consumeAdView } = require('../services/adRewards');
 
 const router = express.Router();
 
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
+const CAIRO_DAY_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Africa/Cairo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+function cairoDayKey(value = new Date()) {
+  const parts = CAIRO_DAY_FORMATTER.formatToParts(new Date(value));
+  const get = (type) => parts.find((part) => part.type === type)?.value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
 // Extra spins expire overnight. Reading them through this rather than off the
@@ -18,9 +25,7 @@ function startOfToday() {
 // cleanup job to run.
 function availableExtraSpins(user) {
   if (!user.extraSpinsDate) return 0;
-  const stored = new Date(user.extraSpinsDate);
-  stored.setHours(0, 0, 0, 0);
-  return stored.getTime() === startOfToday().getTime() ? user.extraSpins || 0 : 0;
+  return cairoDayKey(user.extraSpinsDate) === cairoDayKey() ? user.extraSpins || 0 : 0;
 }
 
 router.get('/leaderboard', async (req, res) => {
@@ -477,7 +482,7 @@ router.post('/grant-extra-spin', auth, async (req, res) => {
     if (!view.ok) return res.status(402).json({ error: view.error });
 
     user.extraSpins = current + 1;
-    user.extraSpinsDate = startOfToday();
+    user.extraSpinsDate = new Date();
     await user.save();
 
     res.json({ extraSpins: user.extraSpins });
@@ -491,18 +496,12 @@ router.post('/spin-wheel', auth, async (req, res) => {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     // Once-a-day limit. Without it the wheel is unlimited free coins, and the
     // "watch an ad for an extra spin" offer is worthless.
     // Set ALLOW_UNLIMITED_SPIN=true in .env to bypass while testing.
     let spendingExtraSpin = false;
     if (process.env.ALLOW_UNLIMITED_SPIN !== 'true' && user.lastSpinClaim) {
-      const lastClaim = new Date(user.lastSpinClaim);
-      lastClaim.setHours(0, 0, 0, 0);
-
-      if (lastClaim.getTime() === today.getTime()) {
+      if (cairoDayKey(user.lastSpinClaim) === cairoDayKey()) {
         // Already had the free spin — an ad-bought one is the only way through.
         if (availableExtraSpins(user) > 0) {
           spendingExtraSpin = true;
@@ -552,7 +551,7 @@ router.post('/spin-wheel', auth, async (req, res) => {
       // Don't move lastSpinClaim — the free spin is already used up for today
       // and overwriting it would hand out a second free one tomorrow morning.
       user.extraSpins = availableExtraSpins(user) - 1;
-      user.extraSpinsDate = startOfToday();
+      user.extraSpinsDate = new Date();
     } else {
       user.lastSpinClaim = new Date();
     }
