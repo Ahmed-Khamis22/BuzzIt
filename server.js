@@ -30,8 +30,11 @@ const adminRoutes = require('./routes/admin');
 const adsRoutes = require('./routes/ads');
 const Question = require('./models/Question');
 const User = require('./models/User');
+const syncFlagQuestions = require('./services/flagQuestionSync');
 
-connectDB();
+connectDB()
+  .then(syncFlagQuestions)
+  .catch((error) => console.error('Flag question sync failed:', error.message));
 
 const app = express();
 
