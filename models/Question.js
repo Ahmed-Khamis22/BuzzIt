@@ -25,4 +25,7 @@ const questionSchema = new mongoose.Schema({
   reportedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 });
 
+// Supports the filters used when selecting the next round question.
+questionSchema.index({ isCustomTrivia: 1, category: 1, difficulty: 1, judgeEvaluated: 1, _id: 1 });
+
 module.exports = mongoose.model('Question', questionSchema);

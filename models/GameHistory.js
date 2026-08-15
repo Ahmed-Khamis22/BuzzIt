@@ -21,4 +21,6 @@ const gameHistorySchema = new mongoose.Schema({
   rewardClaimedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 });
 
+gameHistorySchema.index({ 'players.userId': 1, playedAt: -1 });
+
 module.exports = mongoose.model('GameHistory', gameHistorySchema);

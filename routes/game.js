@@ -29,7 +29,24 @@ router.post('/save', auth, async (req, res) => {
 router.get('/history/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const history = await GameHistory.find({ 'players.userId': userId }).sort({ playedAt: -1 });
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), 100)
+      : 50;
+    const query = { 'players.userId': userId };
+
+    if (req.query.before) {
+      const before = new Date(req.query.before);
+      if (Number.isNaN(before.getTime())) {
+        return res.status(400).json({ error: 'Invalid before cursor' });
+      }
+      query.playedAt = { $lt: before };
+    }
+
+    const history = await GameHistory.find(query)
+      .sort({ playedAt: -1 })
+      .limit(limit)
+      .lean();
     res.json(history);
   } catch (err) {
     res.status(500).json({ error: err.message });

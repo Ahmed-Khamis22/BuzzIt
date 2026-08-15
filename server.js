@@ -664,16 +664,20 @@ async function fetchOneQuestion(room) {
   if (!room.usedQuestions) room.usedQuestions = [];
   let matchStage = await buildMatchStage(room);
 
-  let samples = await Question.aggregate([{ $match: matchStage }, { $sample: { size: 1 } }]);
+  let count = await Question.countDocuments(matchStage);
 
-  if ((!samples || samples.length === 0) && room.usedQuestions.length > 0) {
+  if (count === 0 && room.usedQuestions.length > 0) {
     logDebug(`[Question Pool] All questions used. Resetting pool.`);
     room.usedQuestions = [];
     delete matchStage._id;
-    samples = await Question.aggregate([{ $match: matchStage }, { $sample: { size: 1 } }]);
+    count = await Question.countDocuments(matchStage);
   }
 
-  return (samples && samples.length > 0) ? samples[0] : null;
+  if (count === 0) return null;
+
+  return Question.findOne(matchStage)
+    .skip(Math.floor(Math.random() * count))
+    .lean();
 }
 
 // Pre-fetch next question in background so it's ready instantly
@@ -2287,6 +2291,59 @@ function normalizeArabic(text) {
     const room = rooms[code];
     if (room) {
       if (room.hostTimeout) clearTimeout(room.hostTimeout);
+
+      const previousHostId = room.host;
+      const participatingHostId = room.players[previousHostId]
+        ? previousHostId
+        : Object.keys(room.players).find((id) => (
+          room.hostUserId && String(room.players[id].userId) === String(room.hostUserId)
+        ));
+
+      // In trivia, draw and written-buzzer modes the host is also a scored
+      // player. Socket.IO assigns a new id after reconnecting, so migrate every
+      // piece of player state instead of leaving a ghost with the old score and
+      // treating the new host as a zero-score player.
+      if (participatingHostId && participatingHostId !== socket.id) {
+        if (!room.cards) room.cards = {};
+        room.players[socket.id] = room.players[participatingHostId];
+        room.players[socket.id].disconnected = false;
+        room.players[socket.id].name = room.hostName;
+        room.players[socket.id].userId = room.hostUserId || room.players[socket.id].userId || null;
+        room.players[socket.id].equippedItems = room.hostEquippedItems || room.players[socket.id].equippedItems || null;
+        room.scores[socket.id] = room.scores[participatingHostId] || 0;
+        room.correct[socket.id] = room.correct[participatingHostId] || 0;
+        room.wrong[socket.id] = room.wrong[participatingHostId] || 0;
+        room.cards[socket.id] = room.cards?.[participatingHostId] || { yellow: 0, red: 0 };
+
+        for (const stateMap of [room.triviaAnswers, room.usedLifelines, room.lifelines]) {
+          if (stateMap?.[participatingHostId]) {
+            stateMap[socket.id] = stateMap[participatingHostId];
+            delete stateMap[participatingHostId];
+          }
+        }
+
+        if (room.buzzer === participatingHostId) room.buzzer = socket.id;
+        if (room.drawerId === participatingHostId) room.drawerId = socket.id;
+        if (room.votesToPlayAgain?.delete(participatingHostId)) room.votesToPlayAgain.add(socket.id);
+        if (room.correctGuessers?.delete(participatingHostId)) room.correctGuessers.add(socket.id);
+        if (room.drawnPlayers) {
+          room.drawnPlayers = room.drawnPlayers.map((id) => id === participatingHostId ? socket.id : id);
+        }
+        for (const rejected of room.rejected || []) {
+          if (rejected.playerId === participatingHostId) rejected.playerId = socket.id;
+        }
+        for (const entry of room.appealWindow?.entries || []) {
+          if (entry.playerId === participatingHostId) entry.playerId = socket.id;
+        }
+        if (room.appeal?.playerId === participatingHostId) room.appeal.playerId = socket.id;
+
+        delete room.players[participatingHostId];
+        delete room.scores[participatingHostId];
+        delete room.correct[participatingHostId];
+        delete room.wrong[participatingHostId];
+        delete room.cards[participatingHostId];
+      }
+
       room.host = socket.id;
       room.hostDisconnected = false;
       socket.join(code);
@@ -2296,6 +2353,7 @@ function normalizeArabic(text) {
         code,
         status: room.status,
         hostId: room.host,
+        config: room.config,
         players: Object.entries(room.players).map(([id, p]) => ({
           id,
           name: p.name,
@@ -2317,6 +2375,17 @@ function normalizeArabic(text) {
           : null,
         buzzer: room.buzzer,
       });
+
+      if (room.players[socket.id]) {
+        io.to(code).emit('player-rejoined', {
+          id: socket.id,
+          name: room.players[socket.id].name,
+          userId: room.players[socket.id].userId || null,
+          score: room.scores[socket.id] || 0,
+          equippedItems: room.players[socket.id].equippedItems,
+          cards: room.cards?.[socket.id] || { yellow: 0, red: 0 },
+        });
+      }
 
       io.to(code).emit('host-rejoined');
     }
