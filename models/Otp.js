@@ -16,6 +16,11 @@ const otpSchema = new mongoose.Schema({
     enum: ['verify_email', 'reset_password'],
     required: true,
   },
+  registration: {
+    username: { type: String, trim: true },
+    // Pending signups keep only a password hash and expire with the OTP.
+    passwordHash: { type: String },
+  },
   createdAt: {
     type: Date,
     default: Date.now,

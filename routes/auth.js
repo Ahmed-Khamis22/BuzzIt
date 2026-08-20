@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const Otp = require('../models/Otp');
@@ -50,6 +51,8 @@ const isValidEmail = (email) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
 
+const isGmailAddress = (email) => email.endsWith('@gmail.com');
+
 const isValidPassword = (password) => {
   // At least 8 chars, 1 letter, 1 number
   return /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*#?&]{8,}$/.test(password);
@@ -67,46 +70,47 @@ router.post('/register', registerLimiter, async (req, res) => {
 
     const normalizedEmail = email.trim().toLowerCase();
     
-    if (!isValidEmail(normalizedEmail)) {
-      return res.status(400).json({ error: 'البريد الإلكتروني غير صالح' });
+    if (!isValidEmail(normalizedEmail) || !isGmailAddress(normalizedEmail)) {
+      return res.status(400).json({ error: 'استخدم حساب Gmail حقيقيًا حتى يصلك كود التأكيد' });
     }
 
     if (!isValidPassword(password)) {
       return res.status(400).json({ error: 'كلمة المرور يجب أن تكون 8 أحرف على الأصل وتحتوي على حرف ورقم واحد على الأقل' });
     }
 
-    const existing = await User.findOne({ $or: [{ email: normalizedEmail }, { username }] });
-    if (existing && existing.email !== normalizedEmail) {
+    const [existingByEmail, existingByUsername, pendingUsername] = await Promise.all([
+      User.findOne({ email: normalizedEmail }),
+      User.findOne({ username }),
+      Otp.findOne({
+        purpose: 'verify_email',
+        'registration.username': username,
+        email: { $ne: normalizedEmail },
+      }),
+    ]);
+
+    if ((existingByUsername && existingByUsername.email !== normalizedEmail) || pendingUsername) {
       return res.status(409).json({ error: 'اسم المستخدم مستخدم بالفعل' });
     }
-    // An unverified row is a signup that never finished — the address was
-    // never proven to belong to anyone, so let them start over instead of
-    // hitting "email already taken" on an account they can't get into.
-    if (existing && existing.isVerified) {
+    if (existingByEmail && existingByEmail.isVerified) {
       return res.status(409).json({ error: 'البريد الإلكتروني مستخدم بالفعل' });
     }
 
-    let user;
-    if (existing) {
-      existing.username = username;
-      existing.password = password; // pre('save') re-hashes it
-      await existing.save();
-      user = existing;
-    } else {
-      user = await User.create({ username, email: normalizedEmail, password, isVerified: false });
-    }
-
-    // Generate OTP
+    // The actual User document is created only after the code is confirmed.
     await Otp.deleteMany({ email: normalizedEmail, purpose: 'verify_email' });
     const otpCode = Otp.generateOTP();
-    await Otp.create({ email: normalizedEmail, otp: otpCode, purpose: 'verify_email' });
+    const passwordHash = await bcrypt.hash(password, 10);
+    await Otp.create({
+      email: normalizedEmail,
+      otp: otpCode,
+      purpose: 'verify_email',
+      registration: { username, passwordHash },
+    });
 
     // Send Email. sendEmail swallows its errors and reports false, so check it
     // — otherwise the account sits here unverified with no code on its way and
     // the user has no way to ask for another one.
     const sent = await sendVerificationEmail(normalizedEmail, otpCode);
     if (!sent) {
-      if (!existing) await User.deleteOne({ _id: user._id });
       await Otp.deleteMany({ email: normalizedEmail, purpose: 'verify_email' });
       return res.status(502).json({ error: 'تعذّر إرسال كود التفعيل الآن، يرجى المحاولة بعد قليل.' });
     }
@@ -178,8 +182,34 @@ router.post('/verify-email', verifyLimiter, async (req, res) => {
       return res.status(400).json({ error: 'الكود غير صحيح أو منتهي الصلاحية' });
     }
 
-    const user = await User.findOneAndUpdate({ email: normalizedEmail }, { isVerified: true }, { new: true });
-    await Otp.deleteOne({ _id: otpDoc._id }); // Delete OTP after successful use
+    let user = await User.findOne({ email: normalizedEmail });
+    const pending = otpDoc.registration;
+
+    if (pending?.username && pending?.passwordHash) {
+      if (user) {
+        // Compatibility for unverified rows made by older server versions.
+        user.username = pending.username;
+        user.password = pending.passwordHash;
+        user.isVerified = true;
+      } else {
+        user = new User({
+          username: pending.username,
+          email: normalizedEmail,
+          password: pending.passwordHash,
+          isVerified: true,
+        });
+      }
+      user.$locals.passwordAlreadyHashed = true;
+      await user.save();
+    } else if (user) {
+      // Legacy verification codes did not carry registration details.
+      user.isVerified = true;
+      await user.save();
+    } else {
+      return res.status(410).json({ error: 'انتهت بيانات التسجيل. أنشئ الحساب مرة أخرى.' });
+    }
+
+    await Otp.deleteMany({ email: normalizedEmail, purpose: 'verify_email' });
 
     const populatedUser = await User.findById(user._id)
       .select('-password')
@@ -204,18 +234,38 @@ router.post('/resend-otp', otpLimiter, async (req, res) => {
 
     const normalizedEmail = email.trim().toLowerCase();
     const user = await User.findOne({ email: normalizedEmail });
-    if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
+    const pendingRegistration = purpose === 'verify_email'
+      ? await Otp.findOne({ email: normalizedEmail, purpose }).sort({ createdAt: -1 })
+      : null;
 
-    // Clear old OTPs
+    if (purpose === 'verify_email' && !pendingRegistration && !user) {
+      return res.status(404).json({ error: 'انتهت بيانات التسجيل. أنشئ الحساب مرة أخرى.' });
+    }
+    if (purpose === 'reset_password' && !user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
+
+    const registration = pendingRegistration?.registration?.username
+      ? pendingRegistration.registration
+      : user && !user.isVerified
+        ? { username: user.username, passwordHash: user.password }
+        : undefined;
+
     await Otp.deleteMany({ email: normalizedEmail, purpose });
 
     const otpCode = Otp.generateOTP();
-    await Otp.create({ email: normalizedEmail, otp: otpCode, purpose });
+    await Otp.create({ email: normalizedEmail, otp: otpCode, purpose, registration });
 
+    let sent = false;
     if (purpose === 'verify_email') {
-      await sendVerificationEmail(normalizedEmail, otpCode);
+      sent = await sendVerificationEmail(normalizedEmail, otpCode);
     } else if (purpose === 'reset_password') {
-      await sendPasswordResetEmail(normalizedEmail, otpCode);
+      sent = await sendPasswordResetEmail(normalizedEmail, otpCode);
+    }
+
+    if (!sent) {
+      await Otp.deleteMany({ email: normalizedEmail, purpose });
+      return res.status(502).json({ error: 'تعذّر إرسال الكود الآن، حاول مرة أخرى بعد قليل.' });
     }
 
     res.json({ message: 'تم إرسال الكود بنجاح' });
