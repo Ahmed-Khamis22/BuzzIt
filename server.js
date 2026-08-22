@@ -15,6 +15,17 @@ const { Server } = require('socket.io');
 const connectDB = require('./config/db');
 const cors = require('cors');
 const { saveGameResults } = require('./services/gameService');
+const {
+  getPredictTotalRounds,
+  getEscapingTeam,
+  getPredictMaxPlayers,
+  haveAllActivePredictPlayersAnswered,
+  migratePredictPlayerId,
+  validatePredictTeamSetup,
+  canAssignPredictTeam,
+  evaluatePredictRound,
+} = require('./services/predictGame');
+const { aiJudge } = require('./services/aiJudge');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
 const rateLimit = require('express-rate-limit');
@@ -28,16 +39,18 @@ const feedbackRoutes = require('./routes/feedback');
 const purchasesRoutes = require('./routes/purchases');
 const adminRoutes = require('./routes/admin');
 const adsRoutes = require('./routes/ads');
+const soloGameRoutes = require('./routes/soloGameRoutes');
 const Question = require('./models/Question');
 const User = require('./models/User');
+const CommunityMessage = require('./models/CommunityMessage');
 const jwt = require('jsonwebtoken');
 const syncFlagQuestions = require('./services/flagQuestionSync');
 const syncQuestionCorrections = require('./services/questionCorrectionSync');
+const syncSoloGameQuestions = require('./services/soloQuestionSync');
 
 connectDB()
-  .then(syncFlagQuestions)
-  .then(syncQuestionCorrections)
-  .catch((error) => console.error('Flag question sync failed:', error.message));
+  .then(() => Promise.all([syncFlagQuestions(), syncQuestionCorrections(), syncSoloGameQuestions()]))
+  .catch((error) => console.error('Question sync failed:', error.message));
 
 const app = express();
 
@@ -67,6 +80,7 @@ app.use('/api/ads', adsRoutes);
 
 app.use('/api/', apiLimiter);
 
+app.use('/api/solo-game', soloGameRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/questions', questionsRoutes);
@@ -93,6 +107,15 @@ app.get('/api/app-config', (req, res) => {
   });
 });
 
+app.get('/api/ai/status', async (req, res) => {
+  try {
+    const status = await aiJudge.getStatus({ probe: true });
+    res.json({ judging: status });
+  } catch {
+    res.json({ judging: { available: false, reason: 'PROVIDERS_UNAVAILABLE', providers: [] } });
+  }
+});
+
 app.get('/health', (req, res) => res.status(200).send('OK'));
 app.get('/', (req, res) => res.status(200).send('BuzzIt Server is running'));
 
@@ -101,6 +124,12 @@ const io = new Server(server);
 
 const rooms = {};
 const connectedUsers = new Map();
+const PREDICT_AI_TAKEOVER_GRACE_MS = 10_000;
+
+// REST routes (friend requests) and Socket.IO share the same live-user
+// registry. Requests are still persisted in MongoDB; this is only the
+// immediate in-app notification path for users who are currently online.
+app.set('realtime', { io, connectedUsers });
 
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
@@ -124,15 +153,44 @@ function getPublicRooms() {
   for (const code in rooms) {
     const room = rooms[code];
     if ((room.status === 'LOBBY' || room.status === 'PLAYING') && !room.config?.isPrivate) {
+      const maxPlayers = room.config?.gameMode === 'predict'
+        ? getPredictMaxPlayers(room.config)
+        : 8;
+      const playerCount = room.config?.gameMode === 'predict'
+        ? Object.keys(room.players).length
+        : Object.values(room.players).filter((player) => !player.disconnected).length;
       publicRooms.push({
         code,
         hostName: room.hostName,
-        playerCount: Object.keys(room.players).length,
+        playerCount,
+        maxPlayers,
+        isFull: playerCount >= maxPlayers,
+        joinable: room.status === 'LOBBY' && playerCount < maxPlayers,
+        status: room.status,
         config: room.config || {},
       });
     }
   }
   return publicRooms;
+}
+
+const ROOM_TIMER_KEYS = [
+  'buzzTimeout', 'triviaTimer', 'drawRoundTimer', 'predictTimer', 'afkTimer',
+  'appealTimer', 'nextQuestionTimer', 'hostTimeout', 'inactivityTimeout',
+];
+
+function clearRoomTimers(room) {
+  if (!room) return;
+  for (const key of ROOM_TIMER_KEYS) {
+    if (room[key]) clearTimeout(room[key]);
+    room[key] = null;
+  }
+  for (const timer of Object.values(room.predictAiTakeoverTimers || {})) clearTimeout(timer);
+  room.predictAiTakeoverTimers = {};
+  room.questionPrefetchGeneration = (room.questionPrefetchGeneration || 0) + 1;
+  room.prefetching = false;
+  room.prefetchPromise = null;
+  room.prefetchedQuestion = null;
 }
 
 async function triggerEndGame(code, payload = {}) {
@@ -141,9 +199,7 @@ async function triggerEndGame(code, payload = {}) {
 
   // Cancel any in-flight round timers so they can't fire after the game has
   // already ended and mutate scores that were already saved to the DB.
-  if (room.buzzTimeout) { clearTimeout(room.buzzTimeout); room.buzzTimeout = null; }
-  if (room.triviaTimer) { clearTimeout(room.triviaTimer); room.triviaTimer = null; }
-  if (room.drawRoundTimer) { clearTimeout(room.drawRoundTimer); room.drawRoundTimer = null; }
+  clearRoomTimers(room);
 
   room.status = 'RESULTS';
   if (payload.totalRounds) room.totalRounds = payload.totalRounds;
@@ -169,8 +225,13 @@ async function triggerEndGame(code, payload = {}) {
   }
 
   let coinsEarnedMap = {};
+  let newAchievementsMap = {};
   try {
-    coinsEarnedMap = await saveGameResults(code, room) || {};
+    const results = await saveGameResults(code, room);
+    if (results) {
+      coinsEarnedMap = results.coinsEarnedMap || {};
+      newAchievementsMap = results.newAchievementsMap || {};
+    }
   } catch (err) {
     console.error('Failed to save game results:', err.message);
   }
@@ -183,19 +244,22 @@ async function triggerEndGame(code, payload = {}) {
         userId: p.userId || null, 
         equippedItems: p.equippedItems,
         cards: room.cards?.[id] || { yellow: 0, red: 0 },
-        coinsEarned: coinsEarnedMap[p.userId] || 0
+        coinsEarned: coinsEarnedMap[p.userId] || 0,
+        team: room.predictTeams?.[id] || null
       }
     ])
   );
 
-  io.to(code).emit('game-ended', {
+  room.gameSummary = {
     roomCode: code,
     hostUserId: room.hostUserId || null,
-    scores: room.scores,
+    scores: { ...room.scores },
     players: playersInfo,
-    correct: room.correct,
-    wrong: room.wrong,
-  });
+    correct: { ...room.correct },
+    wrong: { ...room.wrong },
+    newAchievements: newAchievementsMap,
+  };
+  io.to(code).emit('game-ended', room.gameSummary);
 
   // Remove host again so they do not start in the players list if they restart the game
   if (hostAddedBack && hostId) {
@@ -217,6 +281,7 @@ async function triggerEndGame(code, payload = {}) {
           if (clientSocket) clientSocket.leave(code);
         }
       }
+      clearRoomTimers(rooms[code]);
       delete rooms[code];
       io.emit('public-rooms-update', getPublicRooms());
     }
@@ -228,7 +293,35 @@ const path = require('path');
 const drawWords = JSON.parse(fs.readFileSync(path.join(__dirname, 'data/drawWords.json'), 'utf8'));
 
 function logDebug(msg) {
-  try { fs.appendFileSync('debug.log', msg + '\n'); } catch(e) {}
+  if (process.env.DEBUG_GAME_LOGS !== 'true') return;
+  fs.appendFile('debug.log', msg + '\n', () => {});
+}
+
+function scheduleBuzzTimeout(code, playerId, durationMs) {
+  const room = rooms[code];
+  if (!room) return;
+  if (room.buzzTimeout) clearTimeout(room.buzzTimeout);
+  const remainingMs = Math.max(0, durationMs);
+  room.buzzEndTime = Date.now() + remainingMs;
+  room.buzzTimeout = setTimeout(() => {
+    const currentRoom = rooms[code];
+    if (!currentRoom || currentRoom.buzzer !== playerId) return;
+    currentRoom.scores[playerId] = (currentRoom.scores[playerId] || 0) - 1;
+    currentRoom.wrong[playerId] = (currentRoom.wrong[playerId] || 0) + 1;
+    currentRoom.buzzer = null;
+    currentRoom.buzzTimeout = null;
+    currentRoom.buzzEndTime = null;
+
+    io.to(code).emit('score-update', {
+      id: playerId,
+      name: currentRoom.players[playerId]?.name,
+      score: currentRoom.scores[playerId],
+      delta: -1,
+      scores: currentRoom.scores,
+      players: Object.fromEntries(Object.entries(currentRoom.players).map(([id, player]) => [id, player.name])),
+    });
+    io.to(code).emit('buzz-reset');
+  }, remainingMs);
 }
 
 function migrateHost(code) {
@@ -240,7 +333,9 @@ function migrateHost(code) {
   }
 
   logDebug(`[Host Migration] Current host socket ID: ${room.host}`);
-  const activePlayers = Object.entries(room.players).filter(([id, p]) => !p.disconnected);
+  const activePlayers = Object.entries(room.players).filter(([id, p]) => (
+    id !== room.host && !p.disconnected && !p.aiControlled
+  ));
   logDebug(`[Host Migration] Active players count: ${activePlayers.length}`);
   
   if (activePlayers.length === 0) {
@@ -257,12 +352,16 @@ function migrateHost(code) {
   room.hostUserId = newHostPlayer.userId || null;
   room.hostDisconnected = false;
 
-  // Remove this player from the players list of the room
-  delete room.players[newHostId];
-  delete room.scores[newHostId];
-  delete room.correct[newHostId];
-  delete room.wrong[newHostId];
-  if (room.cards) delete room.cards[newHostId];
+  // Predict's host is also a normal participant. Promoting them must not erase
+  // their team, submitted answer, score or place in the player dock.
+  const hostKeepsPlaying = room.config?.gameMode === 'predict';
+  if (!hostKeepsPlaying) {
+    delete room.players[newHostId];
+    delete room.scores[newHostId];
+    delete room.correct[newHostId];
+    delete room.wrong[newHostId];
+    if (room.cards) delete room.cards[newHostId];
+  }
 
   // Send promotion event to the new host
   io.to(newHostId).emit('promoted-to-host', { status: room.status, reason: 'migration' });
@@ -276,8 +375,8 @@ function migrateHost(code) {
   }
 
   // Send update to the room
-  io.to(code).emit('host-changed', { hostName: newHostPlayer.name });
-  io.to(code).emit('player-removed', { id: newHostId });
+  io.to(code).emit('host-changed', { hostName: newHostPlayer.name, hostId: newHostId });
+  if (!hostKeepsPlaying) io.to(code).emit('player-removed', { id: newHostId });
 
   // Reset buzz state on migration
   room.buzzer = null;
@@ -289,6 +388,8 @@ function migrateHost(code) {
 
   // Update public rooms list since playerCount changed
   io.emit('public-rooms-update', getPublicRooms());
+
+  if (hostKeepsPlaying) emitPredictState(code);
   
   logDebug(`[Host Migration] Migration successful. New host: ${newHostPlayer.name}`);
   return true;
@@ -402,6 +503,347 @@ function rotateHost(code) {
   logDebug(`[Host Rotation] Host rotation successful. New host: ${room.hostName}`);
 }
 
+
+function cancelPredictAiTakeover(room, playerId) {
+  const timer = room?.predictAiTakeoverTimers?.[playerId];
+  if (timer) clearTimeout(timer);
+  if (room?.predictAiTakeoverTimers) delete room.predictAiTakeoverTimers[playerId];
+  if (room?.predictBotPendingAnswers) delete room.predictBotPendingAnswers[playerId];
+  if (room?.predictBotGenerations) delete room.predictBotGenerations[playerId];
+}
+
+function fallbackPredictBotAnswer(room, playerId, role) {
+  const candidates = [
+    room.currentQuestion?.answer,
+    ...(room.currentQuestion?.acceptedAnswers || []),
+  ].map((value) => String(value || '').trim()).filter(Boolean);
+  if (candidates.length === 0) return 'مش عارف';
+  if (role === 'hunt') return candidates[0].slice(0, 40);
+  const offset = ((room.predictRound || 1) + String(playerId).length) % candidates.length;
+  return candidates[offset].slice(0, 40);
+}
+
+function commitPredictBotAnswer(code, playerId, round, answer) {
+  const room = rooms[code];
+  if (!room || room.predictRound !== round || room.predictPhase !== 'write') return false;
+  if (!room.players[playerId]?.aiControlled || room.predictAnswers?.[playerId]) return false;
+  const value = String(answer || '').trim().slice(0, 40);
+  if (!value) return false;
+  room.predictAnswers = room.predictAnswers || {};
+  room.predictAnswers[playerId] = value;
+  emitPredictState(code);
+  maybeBeginPredictJudging(code);
+  return true;
+}
+
+async function preparePredictBotAnswer(code, playerId) {
+  const room = rooms[code];
+  if (!room || room.status !== 'PLAYING' || room.config?.gameMode !== 'predict') return;
+  if (!['countdown', 'write'].includes(room.predictPhase) || !room.players[playerId]?.aiControlled) return;
+  if (room.predictAnswers?.[playerId] || room.predictBotGenerations?.[playerId]) return;
+
+  const round = room.predictRound;
+  const role = room.predictTeams?.[playerId] === getEscapingTeam(round) ? 'escape' : 'hunt';
+  const generation = `${round}:${Date.now()}:${Math.random()}`;
+  room.predictBotGenerations = room.predictBotGenerations || {};
+  room.predictBotGenerations[playerId] = generation;
+
+  let answer;
+  try {
+    answer = (await aiJudge.generatePredictBotAnswer({
+      question: room.currentQuestion?.text,
+      role,
+    })).answer;
+  } catch (error) {
+    answer = fallbackPredictBotAnswer(room, playerId, role);
+    console.error('Predict bot answer fallback:', error.message, error.causes || []);
+  }
+
+  const activeRoom = rooms[code];
+  if (!activeRoom || activeRoom.predictBotGenerations?.[playerId] !== generation) return;
+  delete activeRoom.predictBotGenerations[playerId];
+  if (!activeRoom.players[playerId]?.aiControlled || activeRoom.predictRound !== round) return;
+  if (activeRoom.predictPhase === 'countdown') {
+    activeRoom.predictBotPendingAnswers = activeRoom.predictBotPendingAnswers || {};
+    activeRoom.predictBotPendingAnswers[playerId] = answer;
+    return;
+  }
+  commitPredictBotAnswer(code, playerId, round, answer);
+}
+
+function activatePredictAiReplacement(code, playerId) {
+  const room = rooms[code];
+  const player = room?.players?.[playerId];
+  if (!room || !player || !player.disconnected || room.status !== 'PLAYING' || room.config?.gameMode !== 'predict') return;
+  if (room.predictAiTakeoverTimers) delete room.predictAiTakeoverTimers[playerId];
+  player.disconnected = false;
+  player.aiControlled = true;
+  io.to(code).emit('predict-ai-takeover', { playerId, name: player.name });
+  emitPredictState(code);
+  preparePredictBotAnswer(code, playerId);
+
+  if (room.host === playerId && room.hostDisconnected) migrateHost(code);
+}
+
+function movePredictSeatToAi(code, playerId) {
+  const room = rooms[code];
+  const player = room?.players?.[playerId];
+  if (!room || !player || room.status !== 'PLAYING' || room.config?.gameMode !== 'predict') return null;
+
+  const aiPlayerId = 'AI_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+  room.players[aiPlayerId] = { ...player, disconnected: true, aiControlled: false };
+  room.scores[aiPlayerId] = room.scores[playerId] || 0;
+  room.correct[aiPlayerId] = room.correct[playerId] || 0;
+  room.wrong[aiPlayerId] = room.wrong[playerId] || 0;
+  room.cards = room.cards || {};
+  room.cards[aiPlayerId] = room.cards[playerId] || { yellow: 0, red: 0 };
+  migratePredictPlayerId(room, playerId, aiPlayerId);
+
+  if (room.host === playerId) {
+    room.host = aiPlayerId;
+    room.hostDisconnected = true;
+  }
+
+  delete room.players[playerId];
+  delete room.scores[playerId];
+  delete room.correct[playerId];
+  delete room.wrong[playerId];
+  delete room.cards[playerId];
+
+  io.to(code).emit('player-removed', { id: playerId, name: player.name });
+  io.to(code).emit('predict-player-id-migrated', { previousId: playerId, nextId: aiPlayerId });
+  io.to(code).emit('player-joined', {
+    id: aiPlayerId,
+    name: player.name,
+    userId: player.userId || null,
+    score: room.scores[aiPlayerId],
+    equippedItems: player.equippedItems || null,
+    cards: room.cards[aiPlayerId],
+    team: room.predictTeams?.[aiPlayerId] || null,
+    aiControlled: true,
+  });
+
+  activatePredictAiReplacement(code, aiPlayerId);
+  return aiPlayerId;
+}
+
+function schedulePredictAiReplacement(code, playerId) {
+  const room = rooms[code];
+  if (!room || room.status !== 'PLAYING' || room.config?.gameMode !== 'predict') return false;
+  room.predictAiTakeoverTimers = room.predictAiTakeoverTimers || {};
+  if (room.predictAiTakeoverTimers[playerId]) clearTimeout(room.predictAiTakeoverTimers[playerId]);
+  room.predictAiTakeoverTimers[playerId] = setTimeout(
+    () => activatePredictAiReplacement(code, playerId),
+    PREDICT_AI_TAKEOVER_GRACE_MS,
+  );
+  return true;
+}
+
+function predictStateFor(room, playerId) {
+  const team = room.predictTeams?.[playerId] || null;
+  const writerTeam = getEscapingTeam(room.predictRound || 1);
+  
+  return {
+    phase: room.predictPhase || 'write',
+    round: room.predictRound || 1,
+    totalRounds: predictTotalRounds(room),
+    myTeam: team,
+    writerTeam: writerTeam,
+    hostId: room.host,
+    judgeMode: room.config?.judgeMode === 'ai' ? 'ai' : 'host',
+    aiFallbackReason: room.predictAiFallbackReason || null,
+    submitted: Boolean(room.predictAnswers?.[playerId]),
+    submittedPlayerIds: Object.keys(room.predictAnswers || {}),
+    myAnswer: room.predictAnswers?.[playerId] || null,
+    endTime: room.predictEndTime || null,
+    teamScores: predictTeamScores(room),
+    teams: Object.entries(room.players).reduce((teams, [id, player]) => {
+      const playerTeam = room.predictTeams?.[id];
+      if (playerTeam && teams[playerTeam]) teams[playerTeam].push({
+        id,
+        name: player.name,
+        equippedItems: player.equippedItems || null,
+        aiControlled: Boolean(player.aiControlled),
+        disconnected: Boolean(player.disconnected),
+      });
+      return teams;
+    }, { A: [], B: [] }),
+    results: room.predictPhase === 'results' ? room.predictResults : null,
+    answersToJudge: room.predictPhase === 'judging'
+      ? Object.entries(room.predictAnswers || {}).map(([id, ans]) => ({ id, answer: ans, playerName: room.players[id]?.name || '???' }))
+      : null,
+    rejectedPlayerIds: room.predictPhase === 'judging' ? room.predictRejectedPlayerIds || [] : [],
+  };
+}
+
+function emitPredictState(code, targetId = null) {
+  const room = rooms[code];
+  if (!room) return;
+  const ids = targetId ? [targetId] : Object.keys(room.players).filter(id => !room.players[id].disconnected);
+  for (const id of ids) io.to(id).emit('predict-state', predictStateFor(room, id));
+}
+
+function predictTotalRounds(room) {
+  return getPredictTotalRounds(room.config);
+}
+
+function predictTeamScores(room) {
+  const scores = { A: 0, B: 0 };
+  for (const [id, score] of Object.entries(room.scores || {})) {
+    const team = room.predictTeams?.[id];
+    if (team) scores[team] += score;
+  }
+  return scores;
+}
+
+function beginPredictRound(code) {
+  const room = rooms[code];
+  if (!room || room.status !== 'PLAYING' || room.config?.gameMode !== 'predict') return;
+  room.predictRound = (room.predictRound || 0) + 1;
+  room.predictPhase = 'countdown';
+  room.predictAnswers = {}; // everyone writes an answer
+  room.predictResults = null;
+  room.predictRejectedPlayerIds = [];
+  room.predictAiFallbackReason = null;
+  room.predictBotPendingAnswers = {};
+  room.predictBotGenerations = {};
+  room.predictEndTime = Date.now() + 1000;
+  if (room.predictTimer) clearTimeout(room.predictTimer);
+  emitPredictState(code);
+  for (const [playerId, player] of Object.entries(room.players)) {
+    if (player.aiControlled) preparePredictBotAnswer(code, playerId);
+  }
+
+  const preparedRound = room.predictRound;
+  room.predictTimer = setTimeout(() => {
+    const activeRoom = rooms[code];
+    if (!activeRoom || activeRoom.predictPhase !== 'countdown' || activeRoom.predictRound !== preparedRound) return;
+    activeRoom.predictPhase = 'write';
+    activeRoom.predictEndTime = Date.now() + ((activeRoom.config?.timeLimit || 30) * 1000);
+    activeRoom.predictTimer = setTimeout(() => beginPredictJudging(code), activeRoom.predictEndTime - Date.now());
+    emitPredictState(code);
+    for (const [playerId, player] of Object.entries(activeRoom.players)) {
+      if (!player.aiControlled) continue;
+      const pendingAnswer = activeRoom.predictBotPendingAnswers?.[playerId];
+      if (pendingAnswer) {
+        delete activeRoom.predictBotPendingAnswers[playerId];
+        commitPredictBotAnswer(code, playerId, preparedRound, pendingAnswer);
+      } else {
+        preparePredictBotAnswer(code, playerId);
+      }
+    }
+  }, 1000);
+}
+
+function beginPredictJudging(code) {
+  const room = rooms[code];
+  if (!room || room.predictPhase !== 'write') return;
+  if (room.predictTimer) { clearTimeout(room.predictTimer); room.predictTimer = null; }
+
+  room.predictRejectedPlayerIds = [];
+  room.predictEndTime = null;
+  if (room.config?.judgeMode === 'ai') {
+    room.predictPhase = 'ai-judging';
+    emitPredictState(code);
+    runPredictAiJudging(code, room.predictRound);
+    return;
+  }
+  room.predictPhase = 'judging';
+  emitPredictState(code);
+}
+
+async function runPredictAiJudging(code, round) {
+  const room = rooms[code];
+  if (!room || room.predictPhase !== 'ai-judging' || room.predictRound !== round) return;
+  if (Object.keys(room.predictAnswers || {}).length === 0) {
+    evaluatePredictAnswers(code, [], { judgedBy: 'ai', provider: 'none' });
+    return;
+  }
+  try {
+    const judgment = await aiJudge.judgePredictRound({
+      question: room.currentQuestion?.text,
+      answers: Object.entries(room.predictAnswers || {}).map(([playerId, answer]) => ({ playerId, answer })),
+    });
+    const activeRoom = rooms[code];
+    if (!activeRoom || activeRoom.predictPhase !== 'ai-judging' || activeRoom.predictRound !== round) return;
+    evaluatePredictAnswers(code, judgment.rejectedPlayerIds, {
+      judgedBy: 'ai',
+      provider: judgment.provider,
+      reasonsByPlayerId: judgment.reasonsByPlayerId,
+      semanticMatchPairs: judgment.semanticMatchPairs,
+    });
+  } catch (error) {
+    const activeRoom = rooms[code];
+    if (!activeRoom || activeRoom.predictPhase !== 'ai-judging' || activeRoom.predictRound !== round) return;
+    activeRoom.config.judgeMode = 'host';
+    activeRoom.predictPhase = 'judging';
+    activeRoom.predictAiFallbackReason = 'AI_UNAVAILABLE';
+    io.to(code).emit('predict-ai-fallback', { reason: 'AI_UNAVAILABLE' });
+    emitPredictState(code);
+    console.error('Predict AI judging fallback:', error.message, error.causes || []);
+  }
+}
+
+function maybeBeginPredictJudging(code) {
+  const room = rooms[code];
+  if (!room || room.config?.gameMode !== 'predict' || room.predictPhase !== 'write') return;
+  if (haveAllActivePredictPlayersAnswered(room.players, room.predictAnswers)) {
+    beginPredictJudging(code);
+  }
+}
+
+function clearPredictPlayerState(room, playerId) {
+  if (room.config?.gameMode !== 'predict') return;
+  if (room.predictTeams) delete room.predictTeams[playerId];
+  if (room.predictAnswers) delete room.predictAnswers[playerId];
+  if (room.predictTraps) delete room.predictTraps[playerId];
+  if (room.predictVotes) delete room.predictVotes[playerId];
+  room.predictRejectedPlayerIds = (room.predictRejectedPlayerIds || []).filter((id) => id !== playerId);
+}
+
+function evaluatePredictAnswers(code, rejectedPlayerIds = [], judgment = {}) {
+  const room = rooms[code];
+  if (!room || !['judging', 'ai-judging', 'write'].includes(room.predictPhase)) return;
+  if (room.predictTimer) { clearTimeout(room.predictTimer); room.predictTimer = null; }
+
+  const escapingTeam = getEscapingTeam(room.predictRound || 1);
+  
+  const result = evaluatePredictRound({
+    rawAnswers: room.predictAnswers,
+    predictTeams: room.predictTeams,
+    players: room.players,
+    escapingTeam,
+    rejectedPlayerIds,
+    semanticMatchPairs: judgment.semanticMatchPairs || [],
+  });
+
+  for (const answer of result.allAnswers) {
+    answer.judgedBy = judgment.judgedBy || 'host';
+    answer.judgmentReason = judgment.reasonsByPlayerId?.[answer.playerId] || null;
+  }
+
+  for (const [playerId, delta] of Object.entries(result.scoreDeltas)) {
+    room.scores[playerId] = (room.scores[playerId] || 0) + delta;
+  }
+  for (const [playerId, delta] of Object.entries(result.correctDeltas)) {
+    room.correct[playerId] = (room.correct[playerId] || 0) + delta;
+  }
+  for (const [playerId, delta] of Object.entries(result.wrongDeltas)) {
+    room.wrong[playerId] = (room.wrong[playerId] || 0) + delta;
+  }
+  
+  room.predictPhase = 'results';
+  room.predictEndTime = null;
+  room.predictResults = {
+    allAnswers: result.allAnswers,
+    clashes: result.clashes,
+    judgedBy: judgment.judgedBy || 'host',
+    provider: judgment.provider || null,
+  };
+  emitPredictState(code);
+}
+
+
 async function evaluateTriviaRound(code) {
   const room = rooms[code];
   if (!room || room.status !== 'PLAYING' || !room.currentQuestion) return;
@@ -480,12 +922,14 @@ async function evaluateTriviaRound(code) {
   }
 
   if (hasWinner) {
-    setTimeout(async () => {
+    room.nextQuestionTimer = setTimeout(async () => {
+      if (rooms[code] !== room) return;
       await triggerEndGame(code);
     }, 3000);
   } else {
     // Next question automatically after 4 seconds
-    setTimeout(async () => {
+    room.nextQuestionTimer = setTimeout(async () => {
+      if (rooms[code] !== room || room.status !== 'PLAYING') return;
       await fetchAndSendNextQuestion(code);
     }, 4000);
   }
@@ -523,9 +967,13 @@ function endDrawRound(code) {
   }
 
   if (gameOver) {
-    setTimeout(() => triggerEndGame(code), 4000);
+    room.nextQuestionTimer = setTimeout(() => {
+      if (rooms[code] === room) triggerEndGame(code);
+    }, 4000);
   } else {
-    setTimeout(() => startNextDrawRound(code), 4000);
+    room.nextQuestionTimer = setTimeout(() => {
+      if (rooms[code] === room && room.status === 'PLAYING') startNextDrawRound(code);
+    }, 4000);
   }
 }
 
@@ -660,6 +1108,8 @@ async function buildMatchStage(room) {
   if (room.config?.gameMode === 'trivia') {
     matchStage.isCustomTrivia = true;
     if (activeCategories) matchStage.category = { $in: activeCategories };
+  } else if (room.config?.gameMode === 'predict') {
+    matchStage.category = 'predict-questions';
   } else {
     matchStage.isCustomTrivia = { $ne: true };
     if (activeCategories) matchStage.category = { $in: activeCategories };
@@ -707,24 +1157,39 @@ function prefetchNextQuestion(code) {
   if (!room || room.prefetching) return;
   room.prefetching = true;
   room.prefetchedQuestion = null;
+  const generation = (room.questionPrefetchGeneration || 0) + 1;
+  room.questionPrefetchGeneration = generation;
 
   // Build a temporary snapshot of usedQuestions to avoid race conditions
   const usedSnapshot = [...(room.usedQuestions || [])]; 
   const tempRoom = { ...room, usedQuestions: usedSnapshot };
 
-  fetchOneQuestion(tempRoom).then(q => {
-    if (rooms[code]) {
-      rooms[code].prefetchedQuestion = q || null;
-      rooms[code].prefetching = false;
+  const promise = fetchOneQuestion(tempRoom).then(q => {
+    if (rooms[code] === room && room.questionPrefetchGeneration === generation) {
+      room.prefetchedQuestion = q || null;
+      room.prefetching = false;
+      room.prefetchPromise = null;
     }
   }).catch(() => {
-    if (rooms[code]) rooms[code].prefetching = false;
+    if (rooms[code] === room && room.questionPrefetchGeneration === generation) {
+      room.prefetching = false;
+      room.prefetchPromise = null;
+    }
   });
+  room.prefetchPromise = promise;
 }
 
 async function fetchAndSendNextQuestion(code) {
   const room = rooms[code];
   if (!room) return false;
+
+  // A very fast Predict host can advance before the background prefetch
+  // finishes. Reuse that in-flight request; starting a second query from the
+  // same used-question snapshot can select the same question twice in a row.
+  if (room.config?.gameMode === 'predict' && room.prefetching && room.prefetchPromise) {
+    await room.prefetchPromise;
+    if (rooms[code] !== room || room.status !== 'PLAYING') return false;
+  }
 
   if (!room.usedQuestions) room.usedQuestions = [];
 
@@ -746,16 +1211,24 @@ async function fetchAndSendNextQuestion(code) {
     } catch (err) {
       console.error('Failed to get next question:', err);
       io.to(room.host).emit('error', 'حدث خطأ أثناء تحميل السؤال!');
-      setTimeout(() => triggerEndGame(code), 2000);
+      room.nextQuestionTimer = setTimeout(() => {
+        if (rooms[code] === room) triggerEndGame(code);
+      }, 2000);
       return false;
     }
   }
 
   if (!question) {
     io.to(room.host).emit('error', 'لم يتم العثور على أسئلة في التصنيفات المحددة!');
-    setTimeout(() => triggerEndGame(code), 2000);
+    room.nextQuestionTimer = setTimeout(() => {
+      if (rooms[code] === room) triggerEndGame(code);
+    }, 2000);
     return false;
   }
+
+  // The database request may finish after the room was closed or the match
+  // was ended. Never let that stale response start a new round afterward.
+  if (rooms[code] !== room || room.status !== 'PLAYING') return false;
 
   room.currentQuestion = question;
   room.lastCategory = question.category;
@@ -771,12 +1244,18 @@ async function fetchAndSendNextQuestion(code) {
   room.buzzedAnswer = null;
   room.buzzer = null;
   room.triviaAnswers = {};
+  room.predictTraps = {};
+  room.predictVotes = {};
   room.lifelines = {};
+  room.fiftyFiftyChoices = {};
   room.frozenPlayers = new Set();
   if (room.triviaTimer) { clearTimeout(room.triviaTimer); room.triviaTimer = null; }
+  if (room.predictTimer) { clearTimeout(room.predictTimer); room.predictTimer = null; }
 
-  const timeLimit = room.config?.timeLimit || 15;
-  const endTime = room.config?.gameMode === 'trivia' ? Date.now() + (timeLimit * 1000) + 2000 : undefined;
+  const timeLimit = room.config?.timeLimit || 30;
+  const isTimedPhase = room.config?.gameMode === 'trivia' || room.config?.gameMode === 'predict';
+  const endTime = isTimedPhase ? Date.now() + (timeLimit * 1000) + 2000 : undefined;
+  room.currentQuestionEndTime = endTime;
 
   io.to(code).emit('question-updated', {
     id: question._id,
@@ -784,8 +1263,12 @@ async function fetchAndSendNextQuestion(code) {
     category: question.category,
     flagImage: question.flagImage,
     choices: room.config?.gameMode === 'trivia' ? question.choices : undefined,
-    endTime
+    endTime: room.config?.gameMode === 'predict' ? null : endTime
   });
+
+  if (room.config?.gameMode === 'predict') {
+    beginPredictRound(code);
+  }
 
   // Written mode and trivia have no judge pacing the round, so the flag —
   // which IS the question — has to be visible right away. Verbal buzzer mode
@@ -996,6 +1479,80 @@ async function applyPoint(code, playerId, points) {
 
 io.on('connection', (socket) => {
 
+  socket.on('join-community', async (acknowledge = () => {}) => {
+    if (!socket.authUserId) {
+      acknowledge({ ok: false, reason: 'UNAUTHORIZED' });
+      return;
+    }
+
+    socket.join('community');
+    try {
+      const messages = await CommunityMessage.find({})
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .lean();
+      socket.emit('community-history', messages);
+      acknowledge({ ok: true });
+    } catch (error) {
+      console.error('Community history error:', error.message);
+      acknowledge({ ok: false, reason: 'LOAD_FAILED' });
+    }
+  });
+
+  socket.on('leave-community', () => {
+    socket.leave('community');
+  });
+
+  socket.on('send-community-message', async (payload = {}, acknowledge = () => {}) => {
+    if (!socket.authUserId) {
+      acknowledge({ ok: false, reason: 'UNAUTHORIZED' });
+      return;
+    }
+
+    const text = typeof payload.text === 'string' ? payload.text.trim() : '';
+    if (!text || text.length > 300) {
+      acknowledge({ ok: false, reason: 'INVALID_MESSAGE' });
+      return;
+    }
+
+    const now = Date.now();
+    if (socket.lastCommunityMessageAt && now - socket.lastCommunityMessageAt < 700) {
+      acknowledge({ ok: false, reason: 'TOO_FAST' });
+      return;
+    }
+    socket.lastCommunityMessageAt = now;
+
+    try {
+      const user = await User.findById(socket.authUserId)
+        .select('username isAdmin equippedItems')
+        .populate('equippedItems.avatar')
+        .populate('equippedItems.theme')
+        .populate('equippedItems.effect')
+        .populate('equippedItems.border')
+        .populate('equippedItems.cover')
+        .lean();
+      if (!user) {
+        acknowledge({ ok: false, reason: 'USER_NOT_FOUND' });
+        return;
+      }
+
+      const isAnnouncement = payload.isAnnouncement === true && user.isAdmin === true;
+      const message = await CommunityMessage.create({
+        senderId: user._id,
+        senderName: user.username,
+        text,
+        equippedItems: user.equippedItems || {},
+        isAnnouncement,
+      });
+      const serialized = message.toObject();
+      io.to('community').emit('new-community-message', serialized);
+      acknowledge({ ok: true, message: serialized });
+    } catch (error) {
+      console.error('Community message error:', error.message);
+      acknowledge({ ok: false, reason: 'SEND_FAILED' });
+    }
+  });
+
   socket.on('authenticate', (token, acknowledge = () => {}) => {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -1023,22 +1580,40 @@ io.on('connection', (socket) => {
   });
 
   // إرسال دعوة غرفة
-  socket.on('send-room-invite', ({ targetUserId, roomCode, hostName }) => {
+  socket.on('send-room-invite', ({ targetUserId, roomCode, hostName }, acknowledge = () => {}) => {
     const room = rooms[roomCode];
-    if (!socket.authUserId || !room || !room.players[socket.id]) return;
-    const targetSocketId = connectedUsers.get(targetUserId);
-    if (targetSocketId) {
-      io.to(targetSocketId).emit('receive-room-invite', {
-        roomCode,
-        hostName: room.players[socket.id]?.name || room.hostName || hostName,
-      });
+    const isRoomMember = !!room && (room.host === socket.id || !!room.players[socket.id]);
+    if (!socket.authUserId || !isRoomMember) {
+      acknowledge({ delivered: false, reason: 'NOT_IN_ROOM' });
+      return;
     }
+    const targetSocketId = connectedUsers.get(String(targetUserId));
+    if (!targetSocketId || !io.sockets.sockets.has(targetSocketId)) {
+      acknowledge({ delivered: false, reason: 'OFFLINE' });
+      return;
+    }
+    io.to(targetSocketId).emit('receive-room-invite', {
+      roomCode,
+      hostName: room.players[socket.id]?.name || room.hostName || hostName,
+    });
+    acknowledge({ delivered: true });
   });
 
   // حكم بيعمل روم
-  socket.on('create-room', (payload) => {
+  socket.on('create-room', async (payload) => {
     const { hostName, hostUserId, hostEquippedItems, config } = payload || {};
     const verifiedHostUserId = socket.authUserId || null;
+    const normalizedConfig = { ...(config || {}) };
+    if (normalizedConfig.gameMode === 'predict') {
+      normalizedConfig.judgeMode = normalizedConfig.judgeMode === 'ai' ? 'ai' : 'host';
+      if (normalizedConfig.judgeMode === 'ai') {
+        const aiStatus = await aiJudge.getStatus({ probe: true });
+        if (!aiStatus.available) {
+          socket.emit('error', 'تحكيم الـAI غير متاح حاليًا. اختار تحكيم الهوست.');
+          return;
+        }
+      }
+    }
     const code = generateRoomCode();
     rooms[code] = {
       host: socket.id,
@@ -1046,7 +1621,7 @@ io.on('connection', (socket) => {
       hostUserId: verifiedHostUserId,
       hostEquippedItems: hostEquippedItems || null,
       status: 'LOBBY', // LOBBY, PLAYING, RESULTS
-      config: config || {},
+      config: normalizedConfig,
       players: {},
       scores: {},
       correct: {},
@@ -1058,20 +1633,25 @@ io.on('connection', (socket) => {
       triviaAnswers: {},
       triviaTimer: null,
       lifelines: {},
+      fiftyFiftyChoices: {},
       chatMessages: [],
+      predictTeams: {},
     };
 
-    const isPlayingHost = config?.gameMode === 'trivia' || config?.gameMode === 'draw' || (config?.gameMode === 'buzzer' && config?.answerMode === 'written');
+    const isPlayingHost = config?.gameMode === 'predict' || config?.gameMode === 'trivia' || config?.gameMode === 'draw' || (config?.gameMode === 'buzzer' && config?.answerMode === 'written');
     if (isPlayingHost) {
       rooms[code].players[socket.id] = { name: hostName || 'Unknown Host', userId: verifiedHostUserId, disconnected: false, equippedItems: hostEquippedItems || null };
       rooms[code].scores[socket.id] = 0;
       rooms[code].correct[socket.id] = 0;
       rooms[code].wrong[socket.id] = 0;
       rooms[code].cards[socket.id] = { yellow: 0, red: 0 };
+      if (config?.gameMode === 'predict') {
+        rooms[code].predictTeams = { [socket.id]: 'A' };
+      }
     }
 
     socket.join(code);
-    socket.emit('room-created', code);
+    socket.emit('room-created', { code, hostName: rooms[code].hostName });
     
     // Immediately sync the host with the exact room state so they appear in their own lobby accurately
     const playersList = Object.entries(rooms[code].players).map(([id, p]) => ({
@@ -1079,16 +1659,21 @@ io.on('connection', (socket) => {
       name: p.name,
       userId: p.userId || null,
       score: rooms[code].scores[id] || 0,
+      correctAnswers: rooms[code].correct[id] || 0,
+      wrongAnswers: rooms[code].wrong[id] || 0,
       disconnected: p.disconnected,
       equippedItems: p.equippedItems,
+      team: p.team,
       cards: rooms[code].cards?.[id] || { yellow: 0, red: 0 }
     }));
     socket.emit('joined-room', {
       code,
+      playerName: rooms[code].hostName,
       players: playersList,
       status: rooms[code].status,
       config: rooms[code].config,
       hostId: rooms[code].host,
+      predictTeams: rooms[code].predictTeams,
       judge: judgeInfo(rooms[code])
     });
     
@@ -1101,10 +1686,45 @@ io.on('connection', (socket) => {
   });
 
   // لاعب بيدخل روم
-  socket.on('join-room', ({ code, playerName, userId, equippedItems }) => {
+  
+  socket.on('set-predict-team', ({ code, team }, ack) => {
     const room = rooms[code];
-    if (!room) return socket.emit('error', 'الروم مش موجود!');
+    if (!room || room.status !== 'LOBBY' || room.config?.gameMode !== 'predict') {
+      if (typeof ack === 'function') ack({ ok: false });
+      return;
+    }
+    if (!room.players[socket.id]) {
+      if (typeof ack === 'function') ack({ ok: false, message: 'اللاعب غير موجود.' });
+      return;
+    }
+    
+    if (!room.predictTeams) room.predictTeams = {};
+    if (!canAssignPredictTeam(room.players, room.predictTeams, socket.id, team, room.config)) {
+      if (typeof ack === 'function') ack({ ok: false, message: 'الفريق ممتلئ أو الاختيار غير صالح.' });
+      return;
+    }
+    room.predictTeams[socket.id] = team;
+    
+    if (typeof ack === 'function') ack({ ok: true });
+    
+    io.to(code).emit('predict-teams-updated', room.predictTeams);
+  });
+
+  socket.on('join-room', ({ code, playerName, userId, equippedItems, restore = false } = {}, acknowledge) => {
+    const hasAcknowledge = typeof acknowledge === 'function';
+    const respond = (payload) => hasAcknowledge && acknowledge(payload);
+    const room = rooms[code];
+    if (!room) {
+      respond({ ok: false, reason: 'ROOM_NOT_FOUND' });
+      if (restore && !hasAcknowledge) socket.emit('room-restore-failed', { reason: 'ROOM_NOT_FOUND' });
+      if (restore) return;
+      return socket.emit('error', 'الروم مش موجود!');
+    }
     const verifiedUserId = socket.authUserId || null;
+    if (verifiedUserId && room.hostUserId && String(room.hostUserId) === verifiedUserId && room.host !== socket.id) {
+      respond({ ok: false, reason: 'IS_HOST' });
+      return;
+    }
     
     // Check for reconnecting player
     let reconnectingId = null;
@@ -1115,14 +1735,32 @@ io.on('connection', (socket) => {
       }
     }
 
+    if (restore && !reconnectingId) {
+      respond({ ok: false, reason: 'SESSION_NOT_FOUND' });
+      if (!hasAcknowledge) socket.emit('room-restore-failed', { reason: 'SESSION_NOT_FOUND' });
+      return;
+    }
+
     if (!reconnectingId) {
+      if (room.status !== 'LOBBY') {
+        respond({ ok: false, reason: 'GAME_IN_PROGRESS' });
+        return socket.emit('error', 'اللعبة بدأت بالفعل، ولا يمكن دخول لاعب جديد أثناء الجولة.');
+      }
       const activePlayersCount = Object.values(room.players).filter(p => !p.disconnected).length;
-      if (activePlayersCount >= 8) {
-        return socket.emit('error', 'الروم ممتلئة! الحد الأقصى 8 لاعبين.');
+      const roomCapacity = room.config?.gameMode === 'predict'
+        ? getPredictMaxPlayers(room.config)
+        : 8;
+      const occupiedSlots = room.config?.gameMode === 'predict'
+        ? Object.keys(room.players).length
+        : activePlayersCount;
+      if (occupiedSlots >= roomCapacity) {
+        respond({ ok: false, reason: 'ROOM_FULL' });
+        return socket.emit('error', `الروم ممتلئة! الحد الأقصى ${roomCapacity} لاعبين.`);
       }
     }
 
     if (reconnectingId) {
+      cancelPredictAiTakeover(room, reconnectingId);
       if (reconnectingId !== socket.id) {
         // Move old player data to new socket.id
         room.players[socket.id] = room.players[reconnectingId];
@@ -1130,7 +1768,9 @@ io.on('connection', (socket) => {
         room.correct[socket.id] = room.correct[reconnectingId] || 0;
         room.wrong[socket.id] = room.wrong[reconnectingId] || 0;
         if (!room.cards) room.cards = {};
-        room.cards[socket.id] = room.cards[reconnectingId] || { yellow: 0, red: 0 };
+        if (room.cards) room.cards[socket.id] = room.cards[reconnectingId] || { yellow: 0, red: 0 };
+
+        migratePredictPlayerId(room, reconnectingId, socket.id);
 
         if (room.triviaAnswers?.[reconnectingId]) {
           room.triviaAnswers[socket.id] = room.triviaAnswers[reconnectingId];
@@ -1147,18 +1787,35 @@ io.on('connection', (socket) => {
           delete room.lifelines[reconnectingId];
         }
 
+        if (room.fiftyFiftyChoices?.[reconnectingId]) {
+          room.fiftyFiftyChoices[socket.id] = room.fiftyFiftyChoices[reconnectingId];
+          delete room.fiftyFiftyChoices[reconnectingId];
+        }
+
+        if (room.frozenPlayers?.delete(reconnectingId)) {
+          room.frozenPlayers.add(socket.id);
+        }
+
         delete room.players[reconnectingId];
         delete room.scores[reconnectingId];
         delete room.correct[reconnectingId];
         delete room.wrong[reconnectingId];
         delete room.cards[reconnectingId];
+        
+        io.to(code).emit('player-removed', { id: reconnectingId });
       }
 
       room.players[socket.id].disconnected = false;
+      room.players[socket.id].aiControlled = false;
       room.players[socket.id].name = playerName; // Update name just in case
       room.players[socket.id].equippedItems = equippedItems || room.players[socket.id].equippedItems;
 
-      if (room.buzzer === reconnectingId) room.buzzer = socket.id;
+      if (room.buzzer === reconnectingId) {
+        room.buzzer = socket.id;
+        if (room.buzzEndTime) {
+          scheduleBuzzTimeout(code, socket.id, room.buzzEndTime - Date.now());
+        }
+      }
       if (room.drawerId === reconnectingId) room.drawerId = socket.id;
       if (room.correctGuessers?.delete(reconnectingId)) room.correctGuessers.add(socket.id);
       if (room.drawnPlayers) {
@@ -1185,40 +1842,72 @@ io.on('connection', (socket) => {
       // because a buzzer timeout is max 15 seconds. Reconnecting takes longer anyway.
 
       socket.join(code);
+      if (room.config?.gameMode === 'predict' && reconnectingId && reconnectingId !== socket.id) {
+        io.to(code).emit('predict-player-id-migrated', {
+          previousId: reconnectingId,
+          nextId: socket.id,
+        });
+      }
       const playersList = Object.entries(room.players).map(([id, p]) => ({
         id,
         name: p.name,
         userId: p.userId || null,
         score: room.scores[id] || 0,
+        correctAnswers: room.correct[id] || 0,
+        wrongAnswers: room.wrong[id] || 0,
         disconnected: p.disconnected,
         equippedItems: p.equippedItems,
+        team: room.predictTeams?.[id] || null,
         cards: room.cards?.[id] || { yellow: 0, red: 0 }
       }));
 
-      socket.emit('joined-room', { code, playerName, players: playersList, status: room.status, config: room.config, hostId: room.host, judge: judgeInfo(room) });
+      socket.emit('joined-room', { code, playerName, players: playersList, status: room.status, config: room.config, hostId: room.host, judge: judgeInfo(room), predictTeams: room.predictTeams, chatMessages: room.chatMessages || [] });
+      respond({ ok: true, code, role: room.host === socket.id ? 'host' : 'player', status: room.status });
       io.to(code).emit('player-rejoined', {
         id: socket.id,
         name: playerName,
         userId: verifiedUserId,
         score: room.scores[socket.id],
         equippedItems: room.players[socket.id].equippedItems,
+        team: room.predictTeams?.[socket.id] || null,
         cards: room.cards?.[socket.id] || { yellow: 0, red: 0 }
       });
+      if (room.config?.gameMode === 'predict') emitPredictState(code);
       
       // Resend current question state if playing
       if (room.status === 'PLAYING' && room.currentQuestion) {
         socket.emit('question-updated', {
+          id: room.currentQuestion._id,
           text: room.currentQuestion.text,
           category: room.currentQuestion.category,
-          flagImage: room.currentQuestion.flagImage
+          flagImage: room.currentQuestion.flagImage,
+          choices: room.config?.gameMode === 'trivia' ? room.currentQuestion.choices : undefined,
+          endTime: room.currentQuestionEndTime,
         });
+        if (room.currentQuestion.flagImage && (
+          room.config?.gameMode === 'trivia' ||
+          room.config?.answerMode === 'written' ||
+          room.answerRevealed
+        )) {
+          socket.emit('image-revealed', room.currentQuestion.flagImage);
+        }
+        if (room.config?.gameMode === 'trivia') {
+          socket.emit('trivia-state-restored', {
+            answer: room.triviaAnswers?.[socket.id]?.answer || null,
+            usedLifelines: room.usedLifelines?.[socket.id] || {},
+            removedChoices: room.fiftyFiftyChoices?.[socket.id] || [],
+            frozen: room.frozenPlayers?.has(socket.id) || false,
+          });
+        }
         if (room.buzzer) {
           const buzzedPlayer = room.players[room.buzzer];
           socket.emit('buzzed', {
             id: room.buzzer,
             name: buzzedPlayer ? buzzedPlayer.name : 'Unknown',
             equippedItems: buzzedPlayer ? buzzedPlayer.equippedItems : null,
-            timeLimit: room.config?.timeLimit || 0
+            timeLimit: room.buzzEndTime
+              ? Math.max(0, Math.ceil((room.buzzEndTime - Date.now()) / 1000))
+              : (room.config?.timeLimit || 0)
           });
         }
       }
@@ -1241,10 +1930,21 @@ io.on('connection', (socket) => {
         }
         socket.emit('draw-sync-canvas', room.drawStrokes || []);
       }
+
+      // Resend current predict game state if playing predict mode
+      if (room.status === 'PLAYING' && room.config?.gameMode === 'predict') {
+        emitPredictState(code, socket.id);
+      }
+      if (room.status === 'RESULTS' && room.gameSummary) {
+        socket.emit('game-ended', room.gameSummary);
+      }
       return;
     }
 
-    if (room.status === 'RESULTS') return socket.emit('error', 'اللعبة انتهت!');
+    if (room.status === 'RESULTS') {
+      respond({ ok: false, reason: 'GAME_ENDED' });
+      return socket.emit('error', 'اللعبة انتهت!');
+    }
 
     room.players[socket.id] = { name: playerName, userId: verifiedUserId, disconnected: false, equippedItems };
     room.scores[socket.id] = 0;
@@ -1259,22 +1959,36 @@ io.on('connection', (socket) => {
       name: p.name,
       userId: p.userId || null,
       score: room.scores[id] || 0,
+      correctAnswers: room.correct[id] || 0,
+      wrongAnswers: room.wrong[id] || 0,
       disconnected: p.disconnected,
       equippedItems: p.equippedItems,
+      team: p.team,
       cards: room.cards?.[id] || { yellow: 0, red: 0 }
     }));
 
-    socket.emit('joined-room', { code, playerName, players: playersList, status: room.status, config: room.config, hostId: room.host, judge: judgeInfo(room) });
+    socket.emit('joined-room', { code, playerName, players: playersList, status: room.status, config: room.config, hostId: room.host, judge: judgeInfo(room), predictTeams: room.predictTeams, chatMessages: room.chatMessages || [] });
+    respond({ ok: true, code, role: 'player', status: room.status });
     io.to(code).emit('player-joined', { id: socket.id, name: playerName, userId: verifiedUserId, score: 0, equippedItems, cards: { yellow: 0, red: 0 } });
     io.emit('public-rooms-update', getPublicRooms());
 
     // Send current question state if joining mid-game
     if (room.status === 'PLAYING' && room.currentQuestion) {
       socket.emit('question-updated', {
+        id: room.currentQuestion._id,
         text: room.currentQuestion.text,
         category: room.currentQuestion.category,
-        flagImage: room.currentQuestion.flagImage
+        flagImage: room.currentQuestion.flagImage,
+        choices: room.config?.gameMode === 'trivia' ? room.currentQuestion.choices : undefined,
+        endTime: room.currentQuestionEndTime,
       });
+      if (room.currentQuestion.flagImage && (
+        room.config?.gameMode === 'trivia' ||
+        room.config?.answerMode === 'written' ||
+        room.answerRevealed
+      )) {
+        socket.emit('image-revealed', room.currentQuestion.flagImage);
+      }
       if (room.buzzer) {
         const buzzedPlayer = room.players[room.buzzer];
         socket.emit('buzzed', {
@@ -1328,9 +2042,17 @@ io.on('connection', (socket) => {
     room.votesToPlayAgain.clear();
     room.rotatedHostData = {};
     room.usedQuestions = [];
+    if (room.config?.gameMode === 'predict') {
+      room.questionPrefetchGeneration = (room.questionPrefetchGeneration || 0) + 1;
+      room.prefetching = false;
+      room.prefetchPromise = null;
+      room.prefetchedQuestion = null;
+    }
     room.usedLifelines = {};
     room.lifelines = {};
+    room.fiftyFiftyChoices = {};
     room.frozenPlayers = new Set();
+    room.predictRound = 0;
 
     if (room.config.gameMode === 'draw') {
       room.drawnPlayers = [];
@@ -1355,7 +2077,8 @@ io.on('connection', (socket) => {
         score: 0,
         disconnected: p.disconnected,
         equippedItems: p.equippedItems,
-        cards: { yellow: 0, red: 0 }
+        cards: { yellow: 0, red: 0 },
+        team: room.predictTeams?.[id] || null
       }))
     });
 
@@ -1375,6 +2098,13 @@ io.on('connection', (socket) => {
     if (!ALLOW_SOLO_TEST && activePlayersCount < 2) {
       socket.emit('error', 'لا يمكن بدء اللعبة بأقل من لاعبين!');
       return;
+    }
+    if (!ALLOW_SOLO_TEST && room.config?.gameMode === 'predict') {
+      const teamError = validatePredictTeamSetup(room.players, room.predictTeams, room.config);
+      if (teamError) {
+        socket.emit('error', teamError);
+        return;
+      }
     }
     
     room.starting = true;
@@ -1446,29 +2176,7 @@ io.on('connection', (socket) => {
     const timeLimit = room.config?.timeLimit || 0;
     
     if (timeLimit > 0) {
-      if (room.buzzTimeout) clearTimeout(room.buzzTimeout);
-      
-      room.buzzTimeout = setTimeout(() => {
-        const currentRoom = rooms[code];
-        if (currentRoom && currentRoom.buzzer === socket.id) {
-          // Time out penalty
-          console.log(`Player ${socket.id} timed out. Applying -1 penalty.`);
-          currentRoom.scores[socket.id] = (currentRoom.scores[socket.id] || 0) - 1;
-          currentRoom.wrong[socket.id] = (currentRoom.wrong[socket.id] || 0) + 1;
-          currentRoom.buzzer = null;
-          
-          io.to(code).emit('score-update', {
-            id: socket.id,
-            name: currentRoom.players[socket.id]?.name,
-            score: currentRoom.scores[socket.id],
-            delta: -1,
-            scores: currentRoom.scores,
-            players: Object.fromEntries(Object.entries(currentRoom.players).map(([id, p]) => [id, p.name])),
-          });
-          
-          io.to(code).emit('buzz-reset');
-        }
-      }, timeLimit * 1000);
+      scheduleBuzzTimeout(code, socket.id, timeLimit * 1000);
     }
     
     io.to(code).emit('buzzed', { 
@@ -1502,6 +2210,7 @@ io.on('connection', (socket) => {
     };
 
     room.chatMessages.push(msgObj);
+    if (room.chatMessages.length > 100) room.chatMessages.splice(0, room.chatMessages.length - 100);
     io.to(code).emit('room-chat-received', msgObj);
   });
 
@@ -1817,6 +2526,75 @@ io.on('connection', (socket) => {
   });
 
   // إجابة لاعب في وضع التريفيا
+  
+  // Predict & Trap: Player submits a trap
+  socket.on('request-predict-state', (code) => {
+    const room = rooms[code];
+    if (!room || room.config?.gameMode !== 'predict' || !room.players[socket.id]) return;
+    emitPredictState(code, socket.id);
+  });
+
+  socket.on('submit-predict-answer', ({ code, answer } = {}, ack) => {
+    const room = rooms[code];
+    const reject = (message) => typeof ack === 'function' && ack({ ok: false, message });
+    if (!room || room.status !== 'PLAYING' || room.config?.gameMode !== 'predict') return reject('لم يتم العثور على الغرفة.');
+    if (!room.players[socket.id] || room.players[socket.id].disconnected || !room.predictTeams?.[socket.id]) {
+      return reject('أنت لست لاعباً نشطاً في هذه الغرفة.');
+    }
+    if (room.predictPhase !== 'write') return reject('وقت الإجابة انتهى.');
+    if (room.predictAnswers?.[socket.id]) return reject('لقد قمت بإرسال إجابتك بالفعل.');
+    if (typeof answer !== 'string' || !answer.trim() || answer.trim().length > 40) return reject('يجب أن تكون الإجابة نصاً بين 1 و 40 حرفاً.');
+    
+    room.predictAnswers = room.predictAnswers || {};
+    room.predictAnswers[socket.id] = answer.trim();
+    if (typeof ack === 'function') ack({ ok: true });
+    emitPredictState(code); // Update for everyone to show answer counts or readiness
+    
+    maybeBeginPredictJudging(code);
+  });
+
+  socket.on('update-predict-judging', ({ code, rejectedPlayerIds } = {}, ack) => {
+    const room = rooms[code];
+    const reject = (message) => typeof ack === 'function' && ack({ ok: false, message });
+    if (!room || room.status !== 'PLAYING' || room.config?.gameMode !== 'predict') return reject('لم يتم العثور على الغرفة.');
+    if (room.predictPhase !== 'judging') return reject('مرحلة المراجعة انتهت.');
+    if (room.host !== socket.id) return reject('الهوست فقط هو من يراجع الإجابات.');
+    const answerIds = new Set(Object.keys(room.predictAnswers || {}));
+    const nextRejected = [...new Set(Array.isArray(rejectedPlayerIds) ? rejectedPlayerIds : [])]
+      .filter((id) => answerIds.has(id));
+    room.predictRejectedPlayerIds = nextRejected;
+
+    if (typeof ack === 'function') ack({ ok: true });
+    emitPredictState(code);
+  });
+
+  socket.on('submit-predict-judging', ({ code } = {}, ack) => {
+    const room = rooms[code];
+    const reject = (message) => typeof ack === 'function' && ack({ ok: false, message });
+    if (!room || room.status !== 'PLAYING' || room.config?.gameMode !== 'predict') return reject('لم يتم العثور على الغرفة.');
+    if (room.predictPhase !== 'judging') return reject('مرحلة المراجعة انتهت.');
+    if (room.host !== socket.id) return reject('الهوست فقط هو من يعتمد النتيجة.');
+    if (typeof ack === 'function') ack({ ok: true });
+    evaluatePredictAnswers(code, room.predictRejectedPlayerIds || [], { judgedBy: 'host' });
+  });
+
+  socket.on('advance-predict-round', async ({ code } = {}, ack) => {
+    const room = rooms[code];
+    const reject = (message) => typeof ack === 'function' && ack({ ok: false, message });
+    if (!room || room.status !== 'PLAYING' || room.config?.gameMode !== 'predict') return reject('لم يتم العثور على الغرفة.');
+    if (room.predictPhase !== 'results') return reject('النتيجة غير جاهزة بعد.');
+    if (room.host !== socket.id) return reject('الهوست فقط هو من يبدأ الجولة التالية.');
+
+    room.predictPhase = 'advancing';
+    if (typeof ack === 'function') ack({ ok: true });
+
+    if (room.predictRound >= predictTotalRounds(room)) {
+      triggerEndGame(code, { totalRounds: predictTotalRounds(room) });
+    } else {
+      await fetchAndSendNextQuestion(code);
+    }
+  });
+
   socket.on('submit-trivia-answer', ({ code, answer }) => {
     const room = rooms[code];
     if (!room || room.status !== 'PLAYING' || room.config?.gameMode !== 'trivia') return;
@@ -1890,6 +2668,8 @@ io.on('connection', (socket) => {
         const wrongChoices = q.choices.filter(c => c !== q.answer);
         const numToRemove = wrongChoices.length > 1 ? Math.min(2, wrongChoices.length - 1) : 0;
         const toRemove = wrongChoices.sort(() => 0.5 - Math.random()).slice(0, numToRemove);
+        if (!room.fiftyFiftyChoices) room.fiftyFiftyChoices = {};
+        room.fiftyFiftyChoices[socket.id] = toRemove;
         socket.emit('fifty-fifty-result', toRemove);
       }
     }
@@ -1937,6 +2717,7 @@ io.on('connection', (socket) => {
       delete room.correct[playerId];
       delete room.wrong[playerId];
       if (room.cards) delete room.cards[playerId];
+      clearPredictPlayerState(room, playerId);
 
       if (room.buzzer === playerId) {
         room.buzzer = null;
@@ -1956,6 +2737,11 @@ io.on('connection', (socket) => {
       }
 
       io.to(code).emit('player-removed', { id: playerId });
+      if (room.config?.gameMode === 'predict') {
+        io.to(code).emit('predict-teams-updated', room.predictTeams || {});
+        maybeBeginPredictJudging(code);
+        emitPredictState(code);
+      }
       io.emit('public-rooms-update', getPublicRooms());
     } else {
       console.log(`kick-player error: player ${playerId} not found in room ${code}`);
@@ -1967,9 +2753,30 @@ io.on('connection', (socket) => {
     const room = rooms[code];
     if (!room) return;
 
+    if (room.status === 'PLAYING' && room.config?.gameMode === 'predict' && room.players[socket.id]) {
+      socket.leave(code);
+      movePredictSeatToAi(code, socket.id);
+      io.emit('public-rooms-update', getPublicRooms());
+      return;
+    }
+
     if (room.host === socket.id) {
       // Host explicitly left! Try to migrate host.
+      if (room.config?.gameMode === 'predict' && room.players[socket.id]) {
+        delete room.players[socket.id];
+        delete room.scores[socket.id];
+        delete room.correct[socket.id];
+        delete room.wrong[socket.id];
+        if (room.cards) delete room.cards[socket.id];
+        clearPredictPlayerState(room, socket.id);
+        io.to(code).emit('player-removed', { id: socket.id });
+      }
       const migrated = migrateHost(code);
+
+      if (migrated && room.config?.gameMode === 'predict') {
+        io.to(code).emit('predict-teams-updated', room.predictTeams || {});
+        maybeBeginPredictJudging(code);
+      }
       
       if (!migrated) {
         io.to(code).emit('room-closed', 'تم إنهاء الغرفة بواسطة الحكم وعدم وجود لاعبين.');
@@ -1980,9 +2787,7 @@ io.on('connection', (socket) => {
             if (clientSocket) clientSocket.leave(code);
           }
         }
-        if (room.buzzTimeout) clearTimeout(room.buzzTimeout);
-        if (room.hostTimeout) clearTimeout(room.hostTimeout);
-        if (room.inactivityTimeout) clearTimeout(room.inactivityTimeout);
+        clearRoomTimers(room);
         delete rooms[code];
       }
       socket.leave(code);
@@ -2008,6 +2813,7 @@ io.on('connection', (socket) => {
       delete room.correct[socket.id];
       delete room.wrong[socket.id];
       if (room.cards) delete room.cards[socket.id];
+      clearPredictPlayerState(room, socket.id);
       
       if (room.buzzer === socket.id) {
         room.buzzer = null;
@@ -2023,6 +2829,11 @@ io.on('connection', (socket) => {
 
       socket.leave(code);
       io.to(code).emit('player-removed', { id: socket.id, name });
+      if (room.config?.gameMode === 'predict') {
+        io.to(code).emit('predict-teams-updated', room.predictTeams || {});
+        maybeBeginPredictJudging(code);
+        emitPredictState(code);
+      }
       io.emit('public-rooms-update', getPublicRooms());
     }
   });
@@ -2309,6 +3120,12 @@ function normalizeArabic(text) {
           const activeCount = Object.values(room.players).filter(pl => !pl.disconnected).length;
           io.to(code).emit('vote-count-updated', room.votesToPlayAgain.size, activeCount);
         }
+
+        // In Predict, keep the team seat alive. A short grace period lets a
+        // backgrounded phone reconnect; afterward AI temporarily controls the
+        // same player id, team and score instead of shrinking the round.
+        const predictReplacementScheduled = schedulePredictAiReplacement(code, socket.id);
+        if (!predictReplacementScheduled) maybeBeginPredictJudging(code);
       }
 
       // Checked independently of isPlayer: in trivia/draw the host is also
@@ -2337,8 +3154,7 @@ function normalizeArabic(text) {
                   if (clientSocket) clientSocket.leave(code);
                 }
               }
-              if (rooms[code].buzzTimeout) clearTimeout(rooms[code].buzzTimeout);
-              if (rooms[code].inactivityTimeout) clearTimeout(rooms[code].inactivityTimeout);
+              clearRoomTimers(rooms[code]);
               delete rooms[code];
             }
             io.emit('public-rooms-update', getPublicRooms());
@@ -2354,10 +3170,34 @@ function normalizeArabic(text) {
   });
 
   // Re-join as host
-  socket.on('rejoin-host', (code) => {
+  socket.on('rejoin-host', (code, acknowledge) => {
+    const hasAcknowledge = typeof acknowledge === 'function';
+    const respond = (payload) => hasAcknowledge && acknowledge(payload);
     const room = rooms[code];
+    if (!room) {
+      respond({ ok: false, reason: 'ROOM_NOT_FOUND' });
+      if (!hasAcknowledge) socket.emit('room-restore-failed', { reason: 'ROOM_NOT_FOUND' });
+      return;
+    }
     if (room) {
-      if (room.hostUserId && String(room.hostUserId) !== socket.authUserId) return;
+      if (room.hostUserId && String(room.hostUserId) !== socket.authUserId) {
+        // Predict hosts also play. If the migration timeout already promoted
+        // somebody else, let the former host reconnect through the normal
+        // player path so their team, answer and score are migrated safely.
+        const formerPlayer = Object.values(room.players).find((player) => (
+          (player.disconnected || player.aiControlled)
+          && player.userId
+          && String(player.userId) === socket.authUserId
+        ));
+        if (formerPlayer) {
+          socket.emit('host-migrated-to-player', { code, playerName: formerPlayer.name });
+          respond({ ok: true, code, role: 'player', migrated: true, status: room.status });
+        } else {
+          respond({ ok: false, reason: 'HOST_CHANGED' });
+          if (!hasAcknowledge) socket.emit('room-restore-failed', { reason: 'HOST_CHANGED' });
+        }
+        return;
+      }
       if (room.hostTimeout) clearTimeout(room.hostTimeout);
 
       const previousHostId = room.host;
@@ -2366,6 +3206,7 @@ function normalizeArabic(text) {
         : Object.keys(room.players).find((id) => (
           room.hostUserId && String(room.players[id].userId) === String(room.hostUserId)
         ));
+      if (participatingHostId) cancelPredictAiTakeover(room, participatingHostId);
 
       // In trivia, draw and written-buzzer modes the host is also a scored
       // player. Socket.IO assigns a new id after reconnecting, so migrate every
@@ -2375,6 +3216,7 @@ function normalizeArabic(text) {
         if (!room.cards) room.cards = {};
         room.players[socket.id] = room.players[participatingHostId];
         room.players[socket.id].disconnected = false;
+        room.players[socket.id].aiControlled = false;
         room.players[socket.id].name = room.hostName;
         room.players[socket.id].userId = room.hostUserId || room.players[socket.id].userId || null;
         room.players[socket.id].equippedItems = room.hostEquippedItems || room.players[socket.id].equippedItems || null;
@@ -2383,17 +3225,23 @@ function normalizeArabic(text) {
         room.wrong[socket.id] = room.wrong[participatingHostId] || 0;
         room.cards[socket.id] = room.cards?.[participatingHostId] || { yellow: 0, red: 0 };
 
-        for (const stateMap of [room.triviaAnswers, room.usedLifelines, room.lifelines]) {
+        for (const stateMap of [room.triviaAnswers, room.usedLifelines, room.lifelines, room.fiftyFiftyChoices]) {
           if (stateMap?.[participatingHostId]) {
             stateMap[socket.id] = stateMap[participatingHostId];
             delete stateMap[participatingHostId];
           }
         }
 
-        if (room.buzzer === participatingHostId) room.buzzer = socket.id;
+        if (room.buzzer === participatingHostId) {
+          room.buzzer = socket.id;
+          if (room.buzzEndTime) {
+            scheduleBuzzTimeout(code, socket.id, room.buzzEndTime - Date.now());
+          }
+        }
         if (room.drawerId === participatingHostId) room.drawerId = socket.id;
         if (room.votesToPlayAgain?.delete(participatingHostId)) room.votesToPlayAgain.add(socket.id);
         if (room.correctGuessers?.delete(participatingHostId)) room.correctGuessers.add(socket.id);
+        if (room.frozenPlayers?.delete(participatingHostId)) room.frozenPlayers.add(socket.id);
         if (room.drawnPlayers) {
           room.drawnPlayers = room.drawnPlayers.map((id) => id === participatingHostId ? socket.id : id);
         }
@@ -2410,11 +3258,25 @@ function normalizeArabic(text) {
         delete room.correct[participatingHostId];
         delete room.wrong[participatingHostId];
         delete room.cards[participatingHostId];
+
+        migratePredictPlayerId(room, participatingHostId, socket.id);
+
+        io.to(code).emit('player-removed', { id: participatingHostId });
       }
 
       room.host = socket.id;
       room.hostDisconnected = false;
+      if (room.players[socket.id]) {
+        room.players[socket.id].disconnected = false;
+        room.players[socket.id].aiControlled = false;
+      }
       socket.join(code);
+      if (room.config?.gameMode === 'predict' && participatingHostId && participatingHostId !== socket.id) {
+        io.to(code).emit('predict-player-id-migrated', {
+          previousId: participatingHostId,
+          nextId: socket.id,
+        });
+      }
       
       // Emit full state so host screen doesn't reset to LOBBY
       socket.emit('host-rejoined-state', {
@@ -2427,15 +3289,22 @@ function normalizeArabic(text) {
           name: p.name,
           userId: p.userId || null,
           score: room.scores[id] || 0,
+          correctAnswers: room.correct[id] || 0,
+          wrongAnswers: room.wrong[id] || 0,
           disconnected: p.disconnected,
           equippedItems: p.equippedItems,
           cards: room.cards?.[id] || { yellow: 0, red: 0 }
         })),
         currentQuestion: room.currentQuestion ? {
+          id: room.currentQuestion._id,
           text: room.currentQuestion.text,
           category: room.currentQuestion.category,
-          flagImage: room.currentQuestion.flagImage
+          flagImage: room.currentQuestion.flagImage,
+          choices: room.config?.gameMode === 'trivia' ? room.currentQuestion.choices : undefined,
+          endTime: room.currentQuestionEndTime,
         } : null,
+        predictTeams: room.predictTeams,
+        chatMessages: room.chatMessages || [],
         // Written mode: the judge plays like everyone else, so reconnecting
         // must never hand them the answer.
         answer: room.currentQuestion && room.config?.answerMode !== 'written'
@@ -2451,6 +3320,7 @@ function normalizeArabic(text) {
           userId: room.players[socket.id].userId || null,
           score: room.scores[socket.id] || 0,
           equippedItems: room.players[socket.id].equippedItems,
+          team: room.predictTeams?.[socket.id] || null,
           cards: room.cards?.[socket.id] || { yellow: 0, red: 0 },
         });
       }
@@ -2475,7 +3345,33 @@ function normalizeArabic(text) {
         socket.emit('draw-sync-canvas', room.drawStrokes || []);
       }
 
+      if (room.status === 'PLAYING' && room.currentQuestion?.flagImage && (
+        room.config?.gameMode === 'trivia' ||
+        room.config?.answerMode === 'written' ||
+        room.answerRevealed
+      )) {
+        socket.emit('image-revealed', room.currentQuestion.flagImage);
+      }
+
+      if (room.status === 'PLAYING' && room.config?.gameMode === 'trivia' && room.players[socket.id]) {
+        socket.emit('trivia-state-restored', {
+          answer: room.triviaAnswers?.[socket.id]?.answer || null,
+          usedLifelines: room.usedLifelines?.[socket.id] || {},
+          removedChoices: room.fiftyFiftyChoices?.[socket.id] || [],
+          frozen: room.frozenPlayers?.has(socket.id) || false,
+        });
+      }
+
+      if (room.status === 'PLAYING' && room.config?.gameMode === 'predict') {
+        emitPredictState(code, socket.id);
+      }
+
+      if (room.status === 'RESULTS' && room.gameSummary) {
+        socket.emit('game-ended', room.gameSummary);
+      }
+
       io.to(code).emit('host-rejoined');
+      respond({ ok: true, code, role: 'host', status: room.status });
     }
   });
 

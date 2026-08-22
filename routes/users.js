@@ -31,8 +31,10 @@ function availableExtraSpins(user) {
 router.get('/leaderboard', async (req, res) => {
   try {
     const { type, page = 1, limit = 50 } = req.query;
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
+    const parsedPage = Number.parseInt(page, 10);
+    const parsedLimit = Number.parseInt(limit, 10);
+    const pageNum = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
+    const limitNum = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50;
     const skip = (pageNum - 1) * limitNum;
     if (type === 'friends') {
       const header = req.headers.authorization;
@@ -44,7 +46,7 @@ router.get('/leaderboard', async (req, res) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const callerId = decoded.userId;
 
-      const callerUser = await User.findById(callerId);
+      const callerUser = await User.findById(callerId).select('_id friends').lean();
       if (!callerUser) {
         return res.status(404).json({ error: 'المستخدم غير موجود.' });
       }
@@ -56,7 +58,8 @@ router.get('/leaderboard', async (req, res) => {
         .limit(limitNum)
         .select('username totalWins totalGames totalCorrect totalWrong equippedItems')
         .populate('equippedItems.avatar')
-        .populate('equippedItems.border');
+        .populate('equippedItems.border')
+        .lean();
 
       return res.json(friendUsers);
     }
@@ -67,7 +70,8 @@ router.get('/leaderboard', async (req, res) => {
       .limit(limitNum)
       .select('username totalWins totalGames totalCorrect totalWrong equippedItems')
       .populate('equippedItems.avatar')
-      .populate('equippedItems.border');
+      .populate('equippedItems.border')
+      .lean();
     res.json(topUsers);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -649,10 +653,12 @@ router.get('/search', auth, async (req, res) => {
       return res.json([]);
     }
 
+    const normalizedQuery = query.trim().slice(0, 40);
+    const escapedQuery = normalizedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const currentUserId = req.userId;
 
-    const users = await User.find({
-      username: { $regex: query.trim(), $options: 'i' },
+    const usersQuery = User.find({
+      username: { $regex: escapedQuery, $options: 'i' },
       _id: { $ne: currentUserId }
     })
     .select('username bio equippedItems totalWins totalGames')
@@ -660,22 +666,30 @@ router.get('/search', auth, async (req, res) => {
       { path: 'equippedItems.avatar', select: 'name imageUrl price type' },
       { path: 'equippedItems.border', select: 'name imageUrl price type' }
     ])
-    .limit(15);
+    .limit(15)
+    .lean();
 
-    const currentUser = await User.findById(currentUserId);
+    const currentUserQuery = User.findById(currentUserId)
+      .select('friends friendRequestsSent friendRequestsReceived')
+      .lean();
+    const [users, currentUser] = await Promise.all([usersQuery, currentUserQuery]);
     if (!currentUser) return res.status(404).json({ error: 'User not found' });
 
+    const friendIds = new Set((currentUser.friends || []).map(String));
+    const sentIds = new Set((currentUser.friendRequestsSent || []).map(String));
+    const receivedIds = new Set((currentUser.friendRequestsReceived || []).map(String));
     const results = users.map(user => {
+      const userId = String(user._id);
       let relationship = 'none';
-      if (currentUser.friends.includes(user._id)) {
+      if (friendIds.has(userId)) {
         relationship = 'friends';
-      } else if (currentUser.friendRequestsSent.includes(user._id)) {
+      } else if (sentIds.has(userId)) {
         relationship = 'sent';
-      } else if (currentUser.friendRequestsReceived.includes(user._id)) {
+      } else if (receivedIds.has(userId)) {
         relationship = 'received';
       }
       return {
-        ...user.toObject(),
+        ...user,
         relationship
       };
     });
@@ -715,6 +729,16 @@ router.post('/friend-request/:targetUserId', auth, async (req, res) => {
 
     await caller.save();
     await target.save();
+
+    const realtime = req.app.get('realtime');
+    const targetSocketId = realtime?.connectedUsers?.get(String(targetId));
+    if (targetSocketId && realtime.io?.sockets?.sockets?.has(targetSocketId)) {
+      realtime.io.to(targetSocketId).emit('friend-request-received', {
+        requesterId: String(caller._id),
+        requesterName: caller.username,
+        pendingCount: target.friendRequestsReceived.length,
+      });
+    }
 
     res.json({ success: true, message: 'تم إرسال طلب الصداقة بنجاح!' });
   } catch (err) {

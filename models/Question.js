@@ -4,13 +4,15 @@ const questionSchema = new mongoose.Schema({
   text: { type: String, required: true },
   category: {
     type: String,
-    enum: ['reversed-words', 'general-knowledge', 'describe-it', 'flags', 'word-in-song', 'egyptian-movies'],
+    enum: ['reversed-words', 'general-knowledge', 'describe-it', 'flags', 'word-in-song', 'egyptian-movies', 'predict-questions', 'dont-say-my-word'],
     required: true,
   },
   answer: { type: String, required: true },
   // Extra spellings/phrasings that count as correct (e.g. "مصر" for
   // "جمهورية مصر العربية"). Safer than loosening the fuzzy matcher.
   acceptedAnswers: { type: [String], default: [] },
+  // closed: finite answer set; hybrid: local spelling/cache first, then AI; open: AI/cache first.
+  judgeMode: { type: String, enum: ['closed', 'hybrid', 'open'], default: 'hybrid' },
   // Questions a human must score ("sing any song with the word X") have no
   // checkable answer, so they're excluded from written mode where the server
   // grades on its own — otherwise every answer is rejected.

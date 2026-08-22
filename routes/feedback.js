@@ -12,7 +12,7 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ error: 'Feedback content is required' });
     }
 
-    const user = await User.findById(req.userId);
+    const user = await User.findById(req.userId).select('username').lean();
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const feedback = await Feedback.create({
@@ -31,12 +31,16 @@ router.post('/', auth, async (req, res) => {
 // GET /api/feedback (Admin only)
 router.get('/', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.userId);
+    const user = await User.findById(req.userId).select('isAdmin').lean();
     if (!user || !user.isAdmin) {
       return res.status(403).json({ error: 'Access denied. Admins only.' });
     }
 
-    const feedbacks = await Feedback.find().sort({ createdAt: -1 });
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), 200)
+      : 100;
+    const feedbacks = await Feedback.find().sort({ createdAt: -1 }).limit(limit).lean();
     res.json(feedbacks);
   } catch (error) {
     console.error('Get feedback error:', error);
@@ -47,7 +51,7 @@ router.get('/', auth, async (req, res) => {
 // DELETE /api/feedback/:id (Admin only)
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.userId);
+    const user = await User.findById(req.userId).select('isAdmin').lean();
     if (!user || !user.isAdmin) {
       return res.status(403).json({ error: 'Access denied. Admins only.' });
     }

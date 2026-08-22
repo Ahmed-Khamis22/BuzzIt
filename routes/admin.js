@@ -25,7 +25,7 @@ const upload = multer({
 // Middleware to verify Admin status
 const adminOnly = async (req, res, next) => {
   try {
-    const user = await User.findById(req.userId);
+    const user = await User.findById(req.userId).select('isAdmin').lean();
     if (!user || !user.isAdmin) {
       return res.status(403).json({ error: 'عفواً، هذه الصلاحية للمدراء فقط (Admin Only)' });
     }
@@ -64,10 +64,12 @@ router.post('/upload-image', auth, adminOnly, (req, res) => {
 // 📊 GET /api/admin/stats
 router.get('/stats', auth, adminOnly, async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments();
-    const totalItems = await StoreItem.countDocuments();
-    const totalCoupons = await Coupon.countDocuments();
-    const activeAnnouncement = await Announcement.findOne({ isActive: true }).sort({ createdAt: -1 });
+    const [totalUsers, totalItems, totalCoupons, activeAnnouncement] = await Promise.all([
+      User.countDocuments(),
+      StoreItem.countDocuments(),
+      Coupon.countDocuments(),
+      Announcement.findOne({ isActive: true }).sort({ createdAt: -1 }).lean(),
+    ]);
 
     res.json({
       totalUsers,
@@ -121,7 +123,7 @@ router.delete('/store/item/:id', auth, adminOnly, async (req, res) => {
 // 🎟️ GET /api/admin/coupons
 router.get('/coupons', auth, adminOnly, async (req, res) => {
   try {
-    const coupons = await Coupon.find().sort({ createdAt: -1 });
+    const coupons = await Coupon.find().sort({ createdAt: -1 }).lean();
     res.json(coupons);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -181,7 +183,7 @@ router.post('/users/grant', auth, adminOnly, async (req, res) => {
 // 📢 GET & POST Announcements
 router.get('/announcements', async (req, res) => {
   try {
-    const active = await Announcement.findOne({ isActive: true }).sort({ createdAt: -1 });
+    const active = await Announcement.findOne({ isActive: true }).sort({ createdAt: -1 }).lean();
     res.json(active || null);
   } catch (err) {
     res.status(500).json({ error: err.message });

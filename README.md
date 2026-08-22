@@ -10,6 +10,9 @@ app_port: 7860
 # BuzzIt Multiplayer Server
 Multiplayer Node.js + Express + Socket.io backend running on Hugging Face Spaces.
 
+AI provider order, outage handling, and the low-cost Groq paid contingency are
+documented in [`docs/AI_FALLBACK_RUNBOOK.md`](docs/AI_FALLBACK_RUNBOOK.md).
+
 ## Rewarded ads: turning on server-side verification
 
 `POST /api/users/claim-ad-reward`, the daily-task ad and extra wheel spins all

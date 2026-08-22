@@ -15,8 +15,7 @@ router.get('/items', async (req, res) => {
       try {
         const jwt = require('jsonwebtoken');
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const User = require('../models/User');
-        const user = await User.findById(decoded.userId);
+        const user = await User.findById(decoded.userId).select('isAdmin').lean();
         if (user && user.isAdmin) {
           isAdmin = true;
         }
@@ -30,7 +29,7 @@ router.get('/items', async (req, res) => {
       query.isAdminOnly = { $ne: true };
     }
 
-    const items = await StoreItem.find(query);
+    const items = await StoreItem.find(query).lean();
     res.json(items);
   } catch (err) {
     res.status(500).json({ error: err.message });

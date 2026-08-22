@@ -61,6 +61,10 @@ const userSchema = new mongoose.Schema({
     correct: { type: Number, default: 0 },
   },
   dailyTasksClaimed: [{ type: String }],
+  unlockedAchievements: [{ 
+    id: String,
+    unlockedAt: { type: Date, default: Date.now }
+  }],
   createdAt: { type: Date, default: Date.now },
 });
 
