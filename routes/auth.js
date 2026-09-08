@@ -2,6 +2,8 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const Otp = require('../models/Otp');
 const auth = require('../middleware/auth');
@@ -9,9 +11,63 @@ const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/e
 const { emailKey } = require('../middleware/rateLimitKey');
 
 const router = express.Router();
+const googleClient = new OAuth2Client();
 
 function signToken(userId) {
   return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
+}
+
+function publicUser(userId) {
+  return User.findById(userId)
+    .select('-password')
+    .populate('inventory')
+    .populate('equippedItems.avatar')
+    .populate('equippedItems.theme')
+    .populate('equippedItems.effect')
+    .populate('equippedItems.border')
+    .populate('equippedItems.cover');
+}
+
+async function verifyGoogleToken(idToken) {
+  const audience = process.env.GOOGLE_WEB_CLIENT_ID;
+  if (!audience) {
+    const error = new Error('تسجيل الدخول بجوجل غير مُجهّز على السيرفر بعد');
+    error.status = 503;
+    throw error;
+  }
+  if (!idToken) {
+    const error = new Error('بيانات تسجيل الدخول بجوجل ناقصة');
+    error.status = 400;
+    throw error;
+  }
+
+  const ticket = await googleClient.verifyIdToken({ idToken, audience });
+  const payload = ticket.getPayload();
+  if (!payload?.sub || !payload?.email || !payload.email_verified) {
+    const error = new Error('تعذر التأكد من حساب جوجل');
+    error.status = 401;
+    throw error;
+  }
+  return payload;
+}
+
+async function uniqueUsername(preferredName) {
+  const cleaned = String(preferredName || 'لاعب')
+    .trim()
+    .replace(/\s+/g, '_')
+    .slice(0, 15) || 'لاعب';
+  if (!(await User.exists({ username: cleaned }))) return cleaned;
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const suffix = crypto.randomInt(1000, 10000).toString();
+    const candidate = `${cleaned.slice(0, 10)}_${suffix}`;
+    if (!(await User.exists({ username: candidate }))) return candidate;
+  }
+  return `لاعب_${crypto.randomBytes(4).toString('hex')}`.slice(0, 15);
+}
+
+function randomPassword() {
+  return `${crypto.randomBytes(24).toString('hex')}A1`;
 }
 
 // Rate Limiters
@@ -44,6 +100,12 @@ const verifyLimiter = rateLimit({
   limit: 10, // wrong-code attempts per email, still far below 10^6 guesses
   keyGenerator: emailKey,
   message: { error: 'تم تجاوز الحد الأقصى لمحاولات إدخال الكود، يرجى المحاولة بعد 15 دقيقة.' }
+});
+
+const socialAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  message: { error: 'محاولات كثيرة، حاول مرة أخرى بعد قليل.' }
 });
 
 // Validators
@@ -167,6 +229,102 @@ router.post('/login', loginLimiter, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/google', socialAuthLimiter, async (req, res) => {
+  try {
+    const googleProfile = await verifyGoogleToken(req.body?.idToken);
+    const normalizedEmail = googleProfile.email.trim().toLowerCase();
+
+    let user = await User.findOne({
+      $or: [{ googleId: googleProfile.sub }, { email: normalizedEmail }],
+    });
+
+    if (user) {
+      if (user.googleId && user.googleId !== googleProfile.sub) {
+        return res.status(409).json({ error: 'البريد مرتبط بحساب جوجل مختلف' });
+      }
+      user.googleId = googleProfile.sub;
+      user.isGuest = false;
+      user.isVerified = true;
+      if (!user.profileImage && googleProfile.picture) user.profileImage = googleProfile.picture;
+      await user.save();
+    } else {
+      user = await User.create({
+        username: await uniqueUsername(googleProfile.name || normalizedEmail.split('@')[0]),
+        email: normalizedEmail,
+        password: randomPassword(),
+        googleId: googleProfile.sub,
+        isGuest: false,
+        isVerified: true,
+        profileImage: googleProfile.picture || '',
+      });
+    }
+
+    res.json({ token: signToken(user._id), user: await publicUser(user._id) });
+  } catch (err) {
+    console.error('[AUTH] Google sign-in failed:', err.message);
+    res.status(err.status || 401).json({
+      error: err.status ? err.message : 'تعذر تسجيل الدخول بجوجل، حاول مرة أخرى',
+    });
+  }
+});
+
+router.post('/guest', socialAuthLimiter, async (req, res) => {
+  try {
+    const guestId = crypto.randomBytes(8).toString('hex');
+    const requestedName = String(req.body?.username || '').trim();
+    if (!requestedName) return res.status(400).json({ error: 'اسم اللاعب مطلوب' });
+    if (requestedName.length > 15) return res.status(400).json({ error: 'اسم اللاعب يجب ألا يتجاوز 15 حرفاً' });
+    if (await User.exists({ username: requestedName })) {
+      return res.status(409).json({ error: 'اسم اللاعب مستخدم بالفعل، اختر اسمًا آخر' });
+    }
+    const user = await User.create({
+      username: requestedName,
+      email: `guest-${guestId}@guest.hanaksha.invalid`,
+      password: randomPassword(),
+      isGuest: true,
+      isVerified: true,
+    });
+
+    res.status(201).json({ token: signToken(user._id), user: await publicUser(user._id) });
+  } catch (err) {
+    console.error('[AUTH] Guest sign-in failed:', err.message);
+    res.status(500).json({ error: 'تعذر إنشاء حساب ضيف، حاول مرة أخرى' });
+  }
+});
+
+router.post('/google/link', socialAuthLimiter, auth, async (req, res) => {
+  try {
+    const googleProfile = await verifyGoogleToken(req.body?.idToken);
+    const normalizedEmail = googleProfile.email.trim().toLowerCase();
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'الحساب غير موجود' });
+
+    const linkedAccount = await User.findOne({
+      _id: { $ne: user._id },
+      $or: [{ googleId: googleProfile.sub }, { email: normalizedEmail }],
+    });
+    if (linkedAccount) {
+      return res.status(409).json({
+        error: 'حساب جوجل ده مرتبط بحساب حنكشة تاني. سجل الدخول به بدلًا من ربطه.',
+      });
+    }
+
+    user.email = normalizedEmail;
+    user.googleId = googleProfile.sub;
+    user.isGuest = false;
+    user.isVerified = true;
+    if (googleProfile.picture) user.profileImage = googleProfile.picture;
+    await user.save();
+
+    res.json({ user: await publicUser(user._id) });
+  } catch (err) {
+    console.error('[AUTH] Google account linking failed:', err.message);
+    res.status(err.status || 401).json({
+      error: err.status ? err.message : 'تعذر ربط حساب جوجل، حاول مرة أخرى',
+    });
   }
 });
 
