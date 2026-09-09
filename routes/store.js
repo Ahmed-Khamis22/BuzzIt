@@ -6,8 +6,92 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
+const STORE_DAILY_REWARD = 20;
+const CAIRO_DAY_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Africa/Cairo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+function cairoDayKey(value = new Date()) {
+  return CAIRO_DAY_FORMATTER.format(new Date(value));
+}
+
+const HELP_CARDS = [
+  { _id: 'card_freeze_01', name: 'تجميد اللاعبين', description: 'يمنع منافسيك اللي لسه ما جاوبوش من الإجابة في السؤال الحالي.', price: 125, type: 'card', imageUrl: 'card_freeze', consumableKey: 'freeze', isAvailable: true },
+  { _id: 'card_double_01', name: 'دبّلها', description: 'يضاعف نقاط إجابتك الصح.', price: 150, type: 'card', imageUrl: 'card_double', consumableKey: 'double', isAvailable: true },
+  { _id: 'card_fifty_01', name: 'شيل إجابتين', description: 'يشيل اختيارين غلط من السؤال.', price: 100, type: 'card', imageUrl: 'card_fifty', consumableKey: 'fiftyFifty', isAvailable: true },
+  { _id: 'card_shield_01', name: 'الدرع', description: 'يحمي نقاطك من تأثير المنافسين.', price: 175, type: 'card', imageUrl: 'card_shield', consumableKey: 'shield', isAvailable: true },
+];
+
+const PLAYER_AVATARS = [
+  { name: 'زيزو', description: 'دايمًا جاهز للتحدي.', price: 1200, type: 'avatar', imageUrl: 'avatar_game_blue', isAvailable: true },
+  { name: 'لوزة', description: 'خفيفة وداخلة التحدي بثقة.', price: 1200, type: 'avatar', imageUrl: 'avatar_game_purple', isAvailable: true },
+  { name: 'أبو العُرّيف', description: 'حاسبها قبل ما السؤال يخلص.', price: 1200, type: 'avatar', imageUrl: 'avatar_game_glasses', isAvailable: true },
+  { name: 'سُكّرة', description: 'هادية، بس إجاباتها سريعة.', price: 1200, type: 'avatar', imageUrl: 'avatar_game_yellow', isAvailable: true },
+  { name: 'بعبع', description: 'كيوت، بنفسجي، وبيحب الأرقام.', price: 2000, type: 'avatar', imageUrl: 'avatar_game_numbers', isAvailable: true },
+  { name: 'روبو', description: 'روبوت حنكشة الرسمي للكلمات.', price: 2000, type: 'avatar', imageUrl: 'avatar_game_robot', isAvailable: true },
+  { name: 'ريشة', description: 'بتحوّل أي فكرة لرسمة.', price: 1200, type: 'avatar', imageUrl: 'avatar_game_artist', isAvailable: true },
+  { name: 'فِكري', description: 'بيخطط للحركة اللي بعدها.', price: 1200, type: 'avatar', imageUrl: 'avatar_game_strategist', isAvailable: true },
+  { name: 'فهلوية', description: 'الإجابة عندها قبل السؤال.', price: 1200, type: 'avatar', imageUrl: 'avatar_game_quizmaster', isAvailable: true },
+  { name: 'كابتن حنكشة', description: 'صاحب المايك ومولّع القعدة.', price: 1200, type: 'avatar', imageUrl: 'avatar_game_host', isAvailable: true },
+];
+const PLAYER_AVATAR_KEYS = new Set(PLAYER_AVATARS.map((avatar) => avatar.imageUrl));
+
+const PLAYER_BORDERS = [
+  { name: 'الملكي', description: 'بنفسجي وذهبي بطابع ملكي.', price: 3000, type: 'border', imageUrl: 'border_lotus_royal', isAvailable: true },
+  { name: 'نيون سماوي', description: 'إضاءة سماوية بطابع أركيد.', price: 4000, type: 'border', imageUrl: 'border_arcade_sport', isAvailable: true },
+  { name: 'نجوم حنكشة', description: 'نجوم متحركة حوالين صورتك.', price: 99999, gemPrice: 35, isGemOnly: true, type: 'border', imageUrl: 'border_hankasha_star', isAvailable: true },
+  { name: 'بوابة النيون', description: 'إطار متحرك بإضاءة كونية.', price: 99999, gemPrice: 50, isGemOnly: true, type: 'border', imageUrl: 'border_cosmic_arcade', isAvailable: true },
+];
+const GAME_BUZZERS = [
+  { name: 'جرس الطلب', description: 'جرس جديد تستخدمه في تحدي الجرس.', price: 3000, type: 'buzzer', imageUrl: 'bell_restaurant_v1', isAvailable: true },
+];
+const LEGACY_SQUARE_BORDER_KEYS = [
+  'border_fire',
+  'border_neon',
+  'border_diamond',
+  'border_matrix',
+  'border_gold_rush',
+  'border_ocean',
+  'border_magic',
+  'border_cosmic',
+  'border_ice',
+  'border_toxic',
+  'border_dragon',
+  'border_horizon',
+];
+const LEGACY_STORE_COPY = [
+  { imageUrl: 'theme_world_cup', name: 'مصر 2026', description: 'أجواء كورة وتشجيع المنتخب.' },
+  { imageUrl: 'theme_pharaoh', name: 'فرعوني', description: 'دهبي وأسود بطابع مصري قديم.' },
+  { imageUrl: 'theme_ramadan', name: 'رمضان', description: 'فوانيس وليالي القاهرة.' },
+  { imageUrl: 'theme_ultras', name: 'المدرّج', description: 'نار وحماس جمهور الكورة.' },
+  { imageUrl: 'theme_alexandria', name: 'إسكندرية', description: 'بحر وهواء ودرجات أزرق.' },
+  { imageUrl: 'theme_sinai', name: 'سينا', description: 'جبال وسماء مليانة نجوم.' },
+  { imageUrl: 'theme_cairo_night', name: 'القاهرة بالليل', description: 'أنوار القاهرة بعد المغرب.' },
+  { imageUrl: 'theme_nile_egypt', name: 'النيل', description: 'ألوان النيل وأجواء مصر.' },
+];
+
 router.get('/items', async (req, res) => {
   try {
+    await StoreItem.deleteMany({
+      type: 'border',
+      imageUrl: { $in: LEGACY_SQUARE_BORDER_KEYS },
+    });
+    await StoreItem.bulkWrite([...PLAYER_AVATARS, ...PLAYER_BORDERS, ...GAME_BUZZERS].map((item) => ({
+      updateOne: {
+        filter: { imageUrl: item.imageUrl },
+        update: { $set: item },
+        upsert: true,
+      },
+    })));
+    await StoreItem.bulkWrite(LEGACY_STORE_COPY.map(({ imageUrl, ...copy }) => ({
+      updateOne: {
+        filter: { imageUrl },
+        update: { $set: copy },
+      },
+    })));
     let isAdmin = false;
     const header = req.headers.authorization;
     if (header && header.startsWith('Bearer ')) {
@@ -15,8 +99,7 @@ router.get('/items', async (req, res) => {
       try {
         const jwt = require('jsonwebtoken');
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const User = require('../models/User');
-        const user = await User.findById(decoded.userId);
+        const user = await User.findById(decoded.userId).select('isAdmin').lean();
         if (user && user.isAdmin) {
           isAdmin = true;
         }
@@ -26,12 +109,13 @@ router.get('/items', async (req, res) => {
     }
 
     const query = { isAvailable: true };
-    if (!isAdmin) {
-      query.isAdminOnly = { $ne: true };
-    }
+    // Admin-only legacy cosmetics are never part of the public catalog. They
+    // may remain referenced by old accounts until the compensation migration.
+    query.isAdminOnly = { $ne: true };
 
-    const items = await StoreItem.find(query);
-    res.json(items);
+    const items = await StoreItem.find(query).lean();
+    const visibleItems = items.filter((item) => item.type !== 'avatar' || item.isAdminOnly || PLAYER_AVATAR_KEYS.has(item.imageUrl));
+    res.json([...HELP_CARDS, ...visibleItems]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -43,7 +127,8 @@ router.post('/buy', auth, async (req, res) => {
     if (!itemId) return res.status(400).json({ error: 'itemId is required' });
     if (!['coins', 'gems'].includes(currency)) return res.status(400).json({ error: 'Invalid currency' });
 
-    const item = await StoreItem.findById(itemId);
+    const helpCard = HELP_CARDS.find((card) => card._id === itemId);
+    const item = helpCard || await StoreItem.findById(itemId);
     if (!item || !item.isAvailable) {
       return res.status(404).json({ error: 'Item not found' });
     }
@@ -59,7 +144,7 @@ router.post('/buy', auth, async (req, res) => {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (user.inventory.some(id => id.equals(item._id))) {
+    if (!helpCard && user.inventory.some(id => id.equals(item._id))) {
       return res.status(409).json({ error: 'Item already owned' });
     }
 
@@ -89,7 +174,12 @@ router.post('/buy', auth, async (req, res) => {
     if (currency === 'coins') user.coins -= finalPrice;
     else user.gems -= finalPrice;
     
-    user.inventory.push(item._id);
+    if (helpCard) {
+      if (!user.consumables) user.consumables = {};
+      user.consumables[helpCard.consumableKey] = (user.consumables[helpCard.consumableKey] || 0) + 1;
+    } else {
+      user.inventory.push(item._id);
+    }
     await user.save();
 
     if (appliedCoupon) {
@@ -99,7 +189,7 @@ router.post('/buy', auth, async (req, res) => {
 
     const populatedUser = await User.findById(req.userId).populate('inventory');
 
-    res.json({ coins: populatedUser.coins, gems: populatedUser.gems, inventory: populatedUser.inventory });
+    res.json({ coins: populatedUser.coins, gems: populatedUser.gems, inventory: populatedUser.inventory, consumables: populatedUser.consumables });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -141,9 +231,65 @@ router.post('/equip', auth, async (req, res) => {
       .populate('equippedItems.theme')
       .populate('equippedItems.effect')
       .populate('equippedItems.border')
-      .populate('equippedItems.cover');
+      .populate('equippedItems.cover')
+      .populate('equippedItems.buzzer');
 
     res.json(updatedUser);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/daily-reward', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('storeDailyRewardDay').lean();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    res.json({
+      reward: STORE_DAILY_REWARD,
+      claimedToday: user.storeDailyRewardDay === cairoDayKey(),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/daily-reward', auth, async (req, res) => {
+  try {
+    const today = cairoDayKey();
+    const user = await User.findOneAndUpdate(
+      { _id: req.userId, storeDailyRewardDay: { $ne: today } },
+      { $inc: { coins: STORE_DAILY_REWARD }, $set: { storeDailyRewardDay: today } },
+      { new: true }
+    ).select('coins storeDailyRewardDay');
+
+    if (!user) {
+      const exists = await User.exists({ _id: req.userId });
+      if (!exists) return res.status(404).json({ error: 'User not found' });
+      return res.status(409).json({ error: 'استلمت هدية المتجر اليوم بالفعل. ارجع بكرة!' });
+    }
+
+    res.json({ reward: STORE_DAILY_REWARD, coins: user.coins, claimedToday: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/daily-items/refresh', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const refreshCost = 10;
+    if ((user.gems || 0) < refreshCost) {
+      return res.status(400).json({ error: 'لا توجد جواهر كافية لتحديث العناصر.' });
+    }
+    user.gems -= refreshCost;
+    await user.save();
+    res.json({
+      gems: user.gems,
+      refreshSeed: `${Date.now()}-${user._id}`,
+      nextRefreshAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

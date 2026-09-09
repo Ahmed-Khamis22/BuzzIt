@@ -126,17 +126,19 @@ const corrections = [
 ];
 
 async function syncQuestionCorrections() {
-  let matched = 0;
-
-  for (const correction of corrections) {
+  const operations = corrections.map((correction) => {
     const update = { text: correction.text, answer: correction.answer };
     if (correction.choices) update.choices = correction.choices;
+    return {
+      updateMany: {
+        filter: { text: correction.oldText },
+        update: { $set: update },
+      },
+    };
+  });
 
-    const result = await Question.updateMany({ text: correction.oldText }, { $set: update });
-    matched += result.matchedCount;
-  }
-
-  console.log(`Verified question corrections synced (${matched} records matched).`);
+  const result = await Question.bulkWrite(operations, { ordered: false });
+  console.log(`Verified question corrections synced (${result.matchedCount} records matched).`);
 }
 
 module.exports = syncQuestionCorrections;

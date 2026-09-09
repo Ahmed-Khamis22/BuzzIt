@@ -1,10 +1,8 @@
 const AdVerification = require('../models/AdVerification');
 
-// Enforcement is opt-in so this can ship before the AdMob console is wired up.
-// While it's off we log what *would* have been rejected and still pay out —
-// see the rollout note in README. Flip REQUIRE_AD_SSV=true once the logs show
-// real callbacks arriving, and not before, or every player loses their rewards.
-const REQUIRE_AD_SSV = process.env.REQUIRE_AD_SSV === 'true';
+// Secure by default in production. Local/dev environments can explicitly set
+// REQUIRE_AD_SSV=false while wiring Google's server-side verification callback.
+const REQUIRE_AD_SSV = process.env.REQUIRE_AD_SSV !== 'false';
 
 // Google's callback and the app's claim race each other. The callback normally
 // wins, but not always, so give it a moment rather than failing a legitimate

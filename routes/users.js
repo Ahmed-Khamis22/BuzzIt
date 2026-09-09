@@ -28,11 +28,28 @@ function availableExtraSpins(user) {
   return cairoDayKey(user.extraSpinsDate) === cairoDayKey() ? user.extraSpins || 0 : 0;
 }
 
+function addPresence(req, rawUser) {
+  const user = rawUser?.toObject ? rawUser.toObject() : { ...rawUser };
+  const hidden = user.preferences?.onlineStatus === false;
+  const realtime = req.app.get('realtime');
+  const socketId = realtime?.connectedUsers?.get(String(user._id));
+  const online = !hidden && Boolean(socketId && realtime?.io?.sockets?.sockets?.has(socketId));
+  delete user.preferences;
+  return {
+    ...user,
+    hideOnlineStatus: hidden,
+    status: hidden ? 'hidden' : online ? 'online' : 'offline',
+    statusText: hidden ? 'الحالة مخفية' : online ? 'متصل الآن' : 'غير متصل',
+  };
+}
+
 router.get('/leaderboard', async (req, res) => {
   try {
     const { type, page = 1, limit = 50 } = req.query;
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
+    const parsedPage = Number.parseInt(page, 10);
+    const parsedLimit = Number.parseInt(limit, 10);
+    const pageNum = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
+    const limitNum = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50;
     const skip = (pageNum - 1) * limitNum;
     if (type === 'friends') {
       const header = req.headers.authorization;
@@ -44,31 +61,37 @@ router.get('/leaderboard', async (req, res) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const callerId = decoded.userId;
 
-      const callerUser = await User.findById(callerId);
+
+
+      const callerUser = await User.findById(callerId).select('_id friends').lean();
       if (!callerUser) {
         return res.status(404).json({ error: 'المستخدم غير موجود.' });
       }
 
       const friendIds = [callerUser._id, ...(callerUser.friends || [])];
-      const friendUsers = await User.find({ _id: { $in: friendIds } })
-        .sort({ totalWins: -1 })
+      const friendUsers = await User.find({ _id: { $in: friendIds }, 'preferences.showLeaderboard': { $ne: false } })
+        .sort({ xp: -1, totalWins: -1 })
         .skip(skip)
         .limit(limitNum)
-        .select('username totalWins totalGames totalCorrect totalWrong equippedItems')
+        .select('username totalWins totalGames totalCorrect totalWrong xp level equippedItems preferences')
         .populate('equippedItems.avatar')
-        .populate('equippedItems.border');
+        .populate('equippedItems.border')
+        .populate('equippedItems.buzzer')
+        .lean();
 
-      return res.json(friendUsers);
+      return res.json(friendUsers.map((user) => addPresence(req, user)));
     }
 
-    const topUsers = await User.find()
-      .sort({ totalWins: -1 })
+    const topUsers = await User.find({ 'preferences.showLeaderboard': { $ne: false } })
+      .sort({ xp: -1, totalWins: -1 })
       .skip(skip)
       .limit(limitNum)
-      .select('username totalWins totalGames totalCorrect totalWrong equippedItems')
+      .select('username totalWins totalGames totalCorrect totalWrong xp level equippedItems preferences')
       .populate('equippedItems.avatar')
-      .populate('equippedItems.border');
-    res.json(topUsers);
+      .populate('equippedItems.border')
+      .populate('equippedItems.buzzer')
+      .lean();
+    res.json(topUsers.map((user) => addPresence(req, user)));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -192,6 +215,9 @@ router.post('/daily-reward/double', auth, async (req, res) => {
     if (!s.claimedToday) return res.status(400).json({ error: 'استلم مكافأة اليوم الأول.' });
     if (s.doubled) return res.status(409).json({ error: 'ضاعفت مكافأة اليوم بالفعل.' });
 
+    const view = await consumeAdView(req.userId, 'daily-reward-double');
+    if (!view.ok) return res.status(402).json({ error: view.error });
+
     user.coins += s.amount;
     user.dailyDoubledAt = new Date();
     await user.save();
@@ -285,7 +311,7 @@ router.post('/daily-tasks/claim', auth, async (req, res) => {
 // Fixed payouts for rewarded ads. The client sends a reward *type*, never an
 // amount — otherwise anyone can ask for any number of coins without an ad.
 const AD_REWARDS = {
-  coins: { field: 'coins', amount: 50 },
+  coins: { field: 'coins', amount: 100 },
   coins_20: { field: 'coins', amount: 20 },
   gems: { field: 'gems', amount: 2 },
 };
@@ -383,6 +409,9 @@ router.post('/claim-game-reward', auth, async (req, res) => {
       return res.status(400).json({ error: 'اللعبة قصيرة جداً للحصول على مكافأة.' });
     }
 
+    const view = await consumeAdView(req.userId, 'end-game-reward');
+    if (!view.ok) return res.status(402).json({ error: view.error });
+
     const isWinner = game.winnerId && String(game.winnerId) === String(req.userId);
     const reward =
       15 +
@@ -419,10 +448,10 @@ router.post('/claim-game-reward', auth, async (req, res) => {
 // The only valid gem→coin packs. Kept server-side on purpose: the client used
 // to send both the price AND the payout, which let anyone mint unlimited coins.
 const COIN_PACKS = {
-  coins_100: { gemCost: 10, coinAmount: 100 },
-  coins_500: { gemCost: 45, coinAmount: 500 },
-  coins_1000: { gemCost: 80, coinAmount: 1000 },
-  coins_2500: { gemCost: 180, coinAmount: 2500 },
+  coins_500: { gemCost: 10, coinAmount: 500 },
+  coins_2500: { gemCost: 45, coinAmount: 2500 },
+  coins_5000: { gemCost: 80, coinAmount: 5000 },
+  coins_12000: { gemCost: 180, coinAmount: 12000 },
 };
 
 router.post('/exchange-gems-for-coins', auth, async (req, res) => {
@@ -570,13 +599,31 @@ router.post('/spin-wheel', auth, async (req, res) => {
 });
 
 // ── GET Another User Profile & Relationship Status ──
+router.get('/season-rank/:id', auth, async (req, res) => {
+  try {
+    const targetUser = await User.findById(req.params.id).select('xp').lean();
+    if (!targetUser) return res.status(404).json({ error: 'User not found' });
+    const activeFilter = { isBanned: { $ne: true } };
+    const [higherScores, totalPlayers] = await Promise.all([
+      User.countDocuments({ ...activeFilter, xp: { $gt: targetUser.xp || 0 } }),
+      User.countDocuments(activeFilter),
+    ]);
+    const rank = higherScores + 1;
+    const topPercent = totalPlayers > 0 ? Math.max(1, Math.ceil((rank / totalPlayers) * 100)) : 100;
+    res.json({ rank, totalPlayers, topPercent });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/profile/:id', auth, async (req, res) => {
   try {
     const targetUser = await User.findById(req.params.id)
-      .select('username bio totalWins totalGames totalCorrect totalWrong equippedItems createdAt')
+      .select('username bio totalWins totalGames totalCorrect totalWrong xp level equippedItems createdAt preferences.showStats')
       .populate('equippedItems.avatar')
       .populate('equippedItems.border')
-      .populate('equippedItems.cover');
+      .populate('equippedItems.cover')
+      .populate('equippedItems.buzzer');
 
     if (!targetUser) return res.status(404).json({ error: 'User not found' });
 
@@ -591,8 +638,17 @@ router.get('/profile/:id', auth, async (req, res) => {
       relationship = 'received';
     }
 
+    const profile = targetUser.toObject();
+    if (String(targetUser._id) !== String(req.userId) && targetUser.preferences?.showStats === false) {
+      delete profile.totalWins;
+      delete profile.totalGames;
+      delete profile.totalCorrect;
+      delete profile.totalWrong;
+    }
+    delete profile.preferences;
+
     res.json({
-      profile: targetUser,
+      profile,
       relationship
     });
   } catch (err) {
@@ -606,33 +662,38 @@ router.get('/me/friends', auth, async (req, res) => {
     const user = await User.findById(req.userId)
       .populate({
         path: 'friends',
-        select: 'username bio equippedItems totalWins totalGames totalCorrect',
+        select: 'username bio equippedItems totalWins totalGames totalCorrect xp level preferences',
         populate: [
           { path: 'equippedItems.avatar', select: 'name imageUrl price type' },
-          { path: 'equippedItems.border', select: 'name imageUrl price type' }
+          { path: 'equippedItems.border', select: 'name imageUrl price type' },
+          { path: 'equippedItems.buzzer', select: 'name imageUrl price type' }
         ]
       })
       .populate({
         path: 'friendRequestsReceived',
-        select: 'username bio equippedItems totalWins totalGames totalCorrect',
+        select: 'username bio equippedItems totalWins totalGames totalCorrect xp level preferences',
         populate: [
           { path: 'equippedItems.avatar', select: 'name imageUrl price type' },
-          { path: 'equippedItems.border', select: 'name imageUrl price type' }
+          { path: 'equippedItems.border', select: 'name imageUrl price type' },
+          { path: 'equippedItems.buzzer', select: 'name imageUrl price type' }
         ]
       })
       .populate({
         path: 'friendRequestsSent',
-        select: 'username bio equippedItems totalWins totalGames totalCorrect',
+        select: 'username bio equippedItems totalWins totalGames totalCorrect xp level preferences',
         populate: [
           { path: 'equippedItems.avatar', select: 'name imageUrl price type' },
-          { path: 'equippedItems.border', select: 'name imageUrl price type' }
+          { path: 'equippedItems.border', select: 'name imageUrl price type' },
+          { path: 'equippedItems.buzzer', select: 'name imageUrl price type' }
         ]
       });
 
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    const formattedFriends = (user.friends || []).map((friend) => addPresence(req, friend));
+
     res.json({
-      friends: user.friends || [],
+      friends: formattedFriends,
       friendRequestsReceived: user.friendRequestsReceived || [],
       friendRequestsSent: user.friendRequestsSent || []
     });
@@ -649,33 +710,44 @@ router.get('/search', auth, async (req, res) => {
       return res.json([]);
     }
 
+    const normalizedQuery = query.trim().slice(0, 40);
+    const escapedQuery = normalizedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const currentUserId = req.userId;
 
-    const users = await User.find({
-      username: { $regex: query.trim(), $options: 'i' },
+    const usersQuery = User.find({
+      username: { $regex: escapedQuery, $options: 'i' },
       _id: { $ne: currentUserId }
     })
-    .select('username bio equippedItems totalWins totalGames')
+    .select('username bio equippedItems totalWins totalGames xp level')
     .populate([
       { path: 'equippedItems.avatar', select: 'name imageUrl price type' },
-      { path: 'equippedItems.border', select: 'name imageUrl price type' }
+      { path: 'equippedItems.border', select: 'name imageUrl price type' },
+      { path: 'equippedItems.buzzer', select: 'name imageUrl price type' }
     ])
-    .limit(15);
+    .limit(15)
+    .lean();
 
-    const currentUser = await User.findById(currentUserId);
+    const currentUserQuery = User.findById(currentUserId)
+      .select('friends friendRequestsSent friendRequestsReceived')
+      .lean();
+    const [users, currentUser] = await Promise.all([usersQuery, currentUserQuery]);
     if (!currentUser) return res.status(404).json({ error: 'User not found' });
 
+    const friendIds = new Set((currentUser.friends || []).map(String));
+    const sentIds = new Set((currentUser.friendRequestsSent || []).map(String));
+    const receivedIds = new Set((currentUser.friendRequestsReceived || []).map(String));
     const results = users.map(user => {
+      const userId = String(user._id);
       let relationship = 'none';
-      if (currentUser.friends.includes(user._id)) {
+      if (friendIds.has(userId)) {
         relationship = 'friends';
-      } else if (currentUser.friendRequestsSent.includes(user._id)) {
+      } else if (sentIds.has(userId)) {
         relationship = 'sent';
-      } else if (currentUser.friendRequestsReceived.includes(user._id)) {
+      } else if (receivedIds.has(userId)) {
         relationship = 'received';
       }
       return {
-        ...user.toObject(),
+        ...user,
         relationship
       };
     });
@@ -703,6 +775,10 @@ router.post('/friend-request/:targetUserId', auth, async (req, res) => {
       return res.status(404).json({ error: 'المستخدم غير موجود.' });
     }
 
+    if (target.preferences?.allowFriendRequests === false) {
+      return res.status(403).json({ error: 'هذا اللاعب لا يستقبل طلبات صداقة حالياً.' });
+    }
+
     if (caller.friends.includes(targetId)) {
       return res.status(400).json({ error: 'أنتما أصدقاء بالفعل.' });
     }
@@ -715,6 +791,16 @@ router.post('/friend-request/:targetUserId', auth, async (req, res) => {
 
     await caller.save();
     await target.save();
+
+    const realtime = req.app.get('realtime');
+    const targetSocketId = realtime?.connectedUsers?.get(String(targetId));
+    if (targetSocketId && realtime.io?.sockets?.sockets?.has(targetSocketId)) {
+      realtime.io.to(targetSocketId).emit('friend-request-received', {
+        requesterId: String(caller._id),
+        requesterName: caller.username,
+        pendingCount: target.friendRequestsReceived.length,
+      });
+    }
 
     res.json({ success: true, message: 'تم إرسال طلب الصداقة بنجاح!' });
   } catch (err) {

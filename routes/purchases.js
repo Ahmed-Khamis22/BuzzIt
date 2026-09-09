@@ -124,7 +124,13 @@ router.post('/google/verify', auth, async (req, res) => {
     }
 
     user.gems += gems;
-    await user.save();
+    try {
+      await user.save();
+    } catch (saveError) {
+      // Let a retry reclaim the token if wallet persistence failed.
+      await Purchase.deleteOne({ purchaseToken }).catch(() => {});
+      throw saveError;
+    }
 
     // Google auto-refunds anything left unacknowledged for three days, so this
     // has to happen — but the gems are already banked, so a failure here must
@@ -145,6 +151,84 @@ router.post('/google/verify', auth, async (req, res) => {
   } catch (err) {
     console.error('[purchases] verify failed:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Local Payments (InstaPay / Vodafone Cash) Endpoints ──
+
+const EGP_PRICES = {
+  gems_50: 30,
+  gems_150: 80,
+  gems_400: 200,
+  gems_1000: 450,
+};
+
+// GET /api/purchases/config - Returns available payment gateways and InstaPay details
+router.get('/config', auth, (req, res) => {
+  res.json({
+    instapayAddress: process.env.INSTAPAY_ADDRESS || 'hankash@instapay',
+    vodafoneCashNumber: process.env.VODAFONE_CASH_NUMBER || '01012345678',
+    egpPrices: EGP_PRICES,
+    supportedMethods: ['google_play', 'instapay', 'vodafone_cash'],
+  });
+});
+
+// POST /api/purchases/local/submit - Submit InstaPay or Vodafone Cash transfer
+router.post('/local/submit', auth, async (req, res) => {
+  try {
+    const { productId, paymentMethod = 'instapay', referenceNumber, senderName, senderPhone } = req.body;
+
+    if (!productId || !GEM_PRODUCTS[productId]) {
+      return res.status(400).json({ error: 'منتج الجواهر غير معروف.' });
+    }
+
+    if (!['instapay', 'vodafone_cash'].includes(paymentMethod)) {
+      return res.status(400).json({ error: 'طريقة الدفع غير مدعومة.' });
+    }
+
+    const refCode = (referenceNumber || '').trim();
+    if (!refCode || refCode.length < 4) {
+      return res.status(400).json({ error: 'يرجى إدخال رقم العملية أو المرور المرجعي للتحويل بشكل صحيح.' });
+    }
+
+    // Check duplicate reference submission
+    const existingRef = await Purchase.findOne({ referenceNumber: refCode, paymentMethod });
+    if (existingRef) {
+      return res.status(409).json({ error: 'رقم التحويل المرجعي تم استخدامه وتسجيله سابقاً.' });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'المستخدم غير موجود.' });
+
+    const gemsGranted = GEM_PRODUCTS[productId];
+    const amountEgp = EGP_PRICES[productId] || 30;
+
+    await Purchase.create({
+      userId: user._id,
+      productId,
+      orderId: `LOCAL-${Date.now()}`,
+      gemsGranted,
+      platform: 'local',
+      paymentMethod,
+      referenceNumber: refCode,
+      senderName: senderName || null,
+      senderPhone: senderPhone || null,
+      amountEgp,
+      status: 'pending',
+    });
+
+    // Local transfers require an admin to verify the receipt first.
+    // A client-supplied reference must never mint wallet currency.
+    res.status(202).json({
+      success: true,
+      pending: true,
+      gemsGranted: 0,
+      gems: user.gems,
+      message: 'تم استلام طلب التحويل وسيتم إضافة الجواهر بعد المراجعة.',
+    });
+  } catch (err) {
+    console.error('[purchases] local submit failed:', err);
+    res.status(500).json({ error: err.message || 'حدث خطأ أثناء معالجة التحويل.' });
   }
 });
 

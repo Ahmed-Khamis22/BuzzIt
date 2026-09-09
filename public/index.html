@@ -1,0 +1,2089 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>لوحة تحكم حنكشة | Hanaksha Admin</title>
+  <!-- Google Fonts: Cairo & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Inter:wght@500;700;900&display=swap" rel="stylesheet">
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    :root {
+      --bg-main: #FFF9EF;
+      --bg-card: #FFFFFF;
+      --bg-sidebar: #241647;
+      --border-line: rgba(63, 42, 115, 0.12);
+      --border-line-bold: rgba(63, 42, 115, 0.22);
+      --ink-primary: #3F2A73;
+      --ink-muted: #7D709C;
+      --ink-faint: #A69CBF;
+      --primary-violet: #6C4BD8;
+      --primary-dark: #5435B9;
+      --accent-turquoise: #29B8B0;
+      --accent-coral: #FF5370;
+      --accent-gold: #F59E0B;
+      --accent-emerald: #10B981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Cairo', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--ink-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    body.admin-locked > header,
+    body.admin-locked > .app-container { display: none; }
+    .login-gate { display: none; position: fixed; inset: 0; z-index: 2000; background: linear-gradient(145deg, #241647, #6C4BD8); align-items: center; justify-content: center; padding: 24px; }
+    body.admin-locked .login-gate { display: flex; }
+    .login-card { width: min(430px, 100%); background: #fff; border-radius: 26px; padding: 32px; box-shadow: 0 24px 70px rgba(0,0,0,.28); }
+    .login-error { min-height: 24px; color: var(--accent-coral); font-size: 12px; font-weight: 700; text-align: center; }
+
+    /* Header Navigation */
+    header {
+      height: 72px;
+      padding: 0 32px;
+      background: #FFFFFF;
+      border-bottom: 2px solid var(--border-line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 4px 20px rgba(63, 42, 115, 0.05);
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo .logo-badge {
+      background: linear-gradient(135deg, var(--primary-violet), var(--primary-dark));
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 16px rgba(108, 75, 216, 0.3);
+    }
+
+    .brand-title {
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--ink-primary);
+      letter-spacing: -0.5px;
+    }
+
+    .brand-sub {
+      font-size: 12px;
+      color: var(--primary-violet);
+      font-weight: 700;
+    }
+
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-main);
+      padding: 8px 16px;
+      border-radius: 30px;
+      border: 1.5px solid var(--border-line-bold);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      background-color: var(--accent-emerald);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--accent-emerald);
+    }
+
+    /* Container Layout */
+    .app-container {
+      display: flex;
+      flex: 1;
+    }
+
+    /* Sidebar Navigation */
+    aside {
+      width: 280px;
+      background: var(--bg-sidebar);
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      border-radius: 16px;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 15px;
+      font-weight: 700;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      width: 100%;
+      text-align: right;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #FFFFFF;
+    }
+
+    .nav-btn.active {
+      background: #FFFFFF;
+      color: var(--primary-violet);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+
+    .nav-btn.active i {
+      color: var(--primary-violet);
+    }
+
+    /* Main Area */
+    main {
+      flex: 1;
+      padding: 32px;
+      overflow-y: auto;
+    }
+
+    .section-view {
+      display: none;
+      animation: fadeIn 0.25s ease forwards;
+    }
+
+    .section-view.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .page-title-row {
+      margin-bottom: 28px;
+    }
+
+    .page-title {
+      font-size: 26px;
+      font-weight: 900;
+      color: var(--ink-primary);
+    }
+
+    .page-desc {
+      font-size: 14px;
+      color: var(--ink-muted);
+      margin-top: 4px;
+    }
+
+    /* Stats Grid Cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 2px solid var(--border-line);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(63, 42, 115, 0.06);
+      transition: all 0.25s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--primary-violet);
+      box-shadow: 0 14px 35px rgba(63, 42, 115, 0.12);
+    }
+
+    .stat-card .icon-wrap {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+
+    .stat-num {
+      font-size: 32px;
+      font-weight: 900;
+      color: var(--ink-primary);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: var(--ink-muted);
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    /* Content Cards */
+    .content-card {
+      background: var(--bg-card);
+      border: 2px solid var(--border-line);
+      border-radius: 24px;
+      padding: 28px;
+      margin-bottom: 28px;
+      box-shadow: 0 10px 30px rgba(63, 42, 115, 0.05);
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--ink-primary);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Form Controls */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--ink-primary);
+      margin-bottom: 8px;
+    }
+
+    .form-control {
+      width: 100%;
+      background: #FAF8F5;
+      border: 2px solid var(--border-line);
+      border-radius: 14px;
+      padding: 12px 16px;
+      color: var(--ink-primary);
+      font-size: 14px;
+      font-weight: 600;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .form-control:focus {
+      border-color: var(--primary-violet);
+      background: #FFFFFF;
+      box-shadow: 0 0 0 4px rgba(108, 75, 216, 0.12);
+    }
+
+    select.form-control {
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%233F2A73' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: left 16px center;
+      background-size: 18px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 14px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary-violet), var(--primary-dark));
+      color: #FFFFFF;
+      box-shadow: 0 6px 20px rgba(108, 75, 216, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(108, 75, 216, 0.45);
+    }
+
+    .btn-danger {
+      background: #FF5370;
+      color: #FFFFFF;
+    }
+
+    .btn-danger:hover {
+      background: #E03E58;
+    }
+
+    .btn-success { background: var(--accent-emerald); color: #fff; }
+    .badge-status { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+    .badge-active { background: rgba(16,185,129,.13); color: #087A55; }
+    .badge-banned { background: rgba(255,83,112,.13); color: #C62D49; }
+
+    .btn-secondary {
+      background: #FAF8F5;
+      color: var(--ink-primary);
+      border: 1.5px solid var(--border-line-bold);
+    }
+
+    .btn-secondary:hover {
+      background: #FFFFFF;
+      border-color: var(--primary-violet);
+    }
+
+    /* Table Design */
+    .table-responsive {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: right;
+    }
+
+    th {
+      padding: 14px 18px;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--ink-muted);
+      border-bottom: 2px solid var(--border-line);
+      background: #FAF8F5;
+    }
+
+    td {
+      padding: 16px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ink-primary);
+      border-bottom: 1px solid var(--border-line);
+      vertical-align: middle;
+    }
+
+    tr:hover td {
+      background: rgba(108, 75, 216, 0.04);
+    }
+
+    .banner-thumb {
+      width: 120px;
+      height: 60px;
+      border-radius: 12px;
+      object-fit: cover;
+      border: 1.5px solid var(--border-line-bold);
+    }
+
+    /* AI Quota Progress Bar */
+    .progress-bar-wrap {
+      width: 100%;
+      height: 10px;
+      background: #FAF8F5;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 12px;
+      border: 1.5px solid var(--border-line);
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--primary-violet);
+      border-radius: 6px;
+      transition: width 0.4s ease;
+    }
+
+    /* Modal Overlay */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(36, 22, 71, 0.6);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-card {
+      background: #FFFFFF;
+      border: 2px solid var(--border-line-bold);
+      border-radius: 24px;
+      padding: 32px;
+      width: 90%;
+      max-width: 480px;
+      box-shadow: 0 20px 50px rgba(63, 42, 115, 0.2);
+    }
+  </style>
+</head>
+<body class="admin-locked">
+
+  <div class="login-gate" id="loginGate">
+    <form class="login-card" onsubmit="loginAdmin(event)">
+      <div class="card-title" style="justify-content:center;font-size:22px;">دخول إدارة حنكشة</div>
+      <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input id="adminEmailInput" type="email" class="form-control" autocomplete="username" required></div>
+      <div class="form-group"><label class="form-label">كلمة المرور</label><input id="adminPasswordInput" type="password" class="form-control" autocomplete="current-password" required></div>
+      <div id="loginError" class="login-error"></div>
+      <button class="btn btn-primary" type="submit" style="width:100%;">تسجيل الدخول الآمن</button>
+    </form>
+  </div>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div class="brand-logo">
+      <div class="logo-badge">
+        <i data-lucide="zap" style="color: #FFF; width: 24px; height: 24px;"></i>
+      </div>
+      <div>
+        <div class="brand-title">HANAKSHA ADMIN PANEL</div>
+        <div class="brand-sub">لوحة تحكم حنكشة</div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <div class="user-pill">
+        <div class="status-dot"></div>
+        <span id="headerAdminEmail" style="font-weight: 800; font-size: 13px;">حساب الإدارة</span>
+      </div>
+      <button class="btn btn-danger" onclick="logoutAdmin()" style="padding: 8px 16px; font-size: 13px;">
+        <i data-lucide="log-out" style="width: 15px; height: 15px;"></i> تسجيل الخروج
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="app-container">
+    <!-- Sidebar Navigation Tabs -->
+    <aside>
+      <button class="nav-btn active" onclick="switchTab('dashboard', this)">
+        <i data-lucide="layout-dashboard"></i> لوحة الإحصائيات
+      </button>
+      <button class="nav-btn" onclick="switchTab('operations', this)"><i data-lucide="settings"></i> الإصدار والتشغيل</button>
+      <button class="nav-btn" onclick="switchTab('banners', this)">
+        <i data-lucide="image"></i> إدارة البانرات والترتيب
+      </button>
+      <button class="nav-btn" onclick="switchTab('users', this)">
+        <i data-lucide="users"></i> إدارة اللاعبين والحظر
+      </button>
+      <button class="nav-btn" onclick="switchTab('reports', this)">
+        <i data-lucide="flag"></i> بلاغات وتصحيح الأسئلة
+      </button>
+      <button class="nav-btn" onclick="switchTab('feedbacks', this)">
+        <i data-lucide="message-square"></i> شكاوى واقتراحات اللاعبين
+      </button>
+      <button class="nav-btn" onclick="switchTab('questions', this)">
+        <i data-lucide="help-circle"></i> مكتبة وإضافة الأسئلة
+      </button>
+      <button class="nav-btn" onclick="switchTab('ai', this)">
+        <i data-lucide="bot"></i> مراقبة الذكاء الاصطناعي
+      </button>
+      <button class="nav-btn" onclick="switchTab('store', this)">
+        <i data-lucide="shopping-bag"></i> إدارة المتجر والشحن
+      </button>
+      <button class="nav-btn" onclick="switchTab('purchases', this)">
+        <i data-lucide="receipt"></i> مراجعة التحويلات
+      </button>
+    </aside>
+
+    <!-- Main View Panel -->
+    <main>
+      <!-- TAB 1: OVERVIEW DASHBOARD -->
+      <div id="tab-dashboard" class="section-view active">
+        <div class="page-title-row">
+          <h1 class="page-title">مرحباً بك في لوحة تحكم حنكشة (Hanaksha)</h1>
+          <p class="page-desc">مؤشرات الأداء المباشرة، إحصائيات المباريات والحسابات المسجلة</p>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="icon-wrap" style="background: rgba(108, 75, 216, 0.12); color: var(--primary-violet);">
+              <i data-lucide="users" style="width: 24px; height: 24px;"></i>
+            </div>
+            <div class="stat-num" id="statTotalUsers">0</div>
+            <div class="stat-label">إجمالي الحسابات المسجلة</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="icon-wrap" style="background: rgba(41, 184, 176, 0.12); color: var(--accent-turquoise);">
+              <i data-lucide="gamepad-2" style="width: 24px; height: 24px;"></i>
+            </div>
+            <div class="stat-num" id="statTotalGames">0</div>
+            <div class="stat-label">إجمالي المباريات المكتملة</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="icon-wrap" style="background: rgba(255, 83, 112, 0.12); color: var(--accent-coral);">
+              <i data-lucide="image" style="width: 24px; height: 24px;"></i>
+            </div>
+            <div class="stat-num" id="statTotalBanners">0</div>
+            <div class="stat-label">البانرات الإعلانية النشطة</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="icon-wrap" style="background: rgba(245, 158, 11, 0.12); color: var(--accent-gold);">
+              <i data-lucide="cpu" style="width: 24px; height: 24px;"></i>
+            </div>
+            <div class="stat-num" id="statUptime">0s</div>
+            <div class="stat-label">زمن تشغيل السيرفر</div>
+          </div>
+          <div class="stat-card">
+            <div class="icon-wrap" style="background: rgba(16,185,129,.12); color: var(--accent-emerald);"><i data-lucide="wifi"></i></div>
+            <div class="stat-num" id="statOnlineUsers">0</div>
+            <div class="stat-label">لاعب متصل الآن</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-purchases" class="section-view">
+        <div class="page-title-row"><h1 class="page-title">مراجعة تحويلات الشحن اليدوية</h1><p class="page-desc">اعتماد أو رفض طلبات InstaPay وVodafone Cash؛ الجواهر لا تُضاف إلا بعد الاعتماد.</p></div>
+        <div class="content-card">
+          <div style="display:flex;gap:12px;margin-bottom:18px;">
+            <select id="purchaseStatusFilter" class="form-control" style="max-width:220px;" onchange="loadPurchases()"><option value="pending">بانتظار المراجعة</option><option value="completed">المعتمدة</option><option value="rejected">المرفوضة</option><option value="all">الكل</option></select>
+            <button class="btn btn-secondary" onclick="loadPurchases()">تحديث</button>
+          </div>
+          <div class="table-responsive"><table><thead><tr><th>اللاعب</th><th>الطريقة</th><th>رقم العملية</th><th>القيمة</th><th>الجواهر</th><th>التاريخ</th><th>الحالة والإجراء</th></tr></thead><tbody id="purchasesTableBody"><tr><td colspan="7">جاري التحميل...</td></tr></tbody></table></div>
+        </div>
+      </div>
+
+      <div id="tab-operations" class="section-view">
+        <div class="page-title-row"><h1 class="page-title">إدارة الإصدار وتشغيل التطبيق</h1><p class="page-desc">تحكم في أقل نسخة مسموحة، رابط Google Play، ووضع الصيانة بدون تعديل كود السيرفر.</p></div>
+        <form class="content-card" onsubmit="saveAppSettings(event)" style="max-width:760px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;"><div class="form-group"><label class="form-label">أحدث نسخة منشورة</label><input id="latestVersionInput" class="form-control" placeholder="1.0.5" required></div><div class="form-group"><label class="form-label">أقل نسخة مسموحة</label><input id="minVersionInput" class="form-control" placeholder="1.0.4" required></div></div>
+          <div class="form-group"><label class="form-label">رابط التطبيق على Google Play</label><input id="storeUrlInput" type="url" class="form-control" required></div>
+          <div class="form-group" style="display:flex;align-items:center;gap:10px;"><input id="maintenanceEnabledInput" type="checkbox" style="width:20px;height:20px;"><label class="form-label" style="margin:0;">تشغيل وضع الصيانة وإيقاف دخول اللاعبين مؤقتًا</label></div>
+          <div class="form-group"><label class="form-label">رسالة الصيانة</label><textarea id="maintenanceMessageInput" class="form-control" maxlength="240" rows="3"></textarea></div>
+          <button class="btn btn-primary" type="submit">حفظ إعدادات التشغيل</button>
+        </form>
+      </div>
+
+      <!-- TAB 2: BANNERS & REORDERING -->
+      <div id="tab-banners" class="section-view">
+        <div class="page-title-row">
+          <h1 class="page-title">إدارة البانرات والترتيب المتعدد</h1>
+          <p class="page-desc">إضافة صورة البانر وتحديد وجهتها، مع إمكانية الترتيب والسحب والتنقل بين الإعلانات</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 400px 1fr; gap: 28px;">
+          <!-- Add Banner Form -->
+          <div class="content-card">
+            <div class="card-title"><i data-lucide="plus-circle" style="color: var(--primary-violet);"></i> إضافة إعلان مصور جديد</div>
+
+            <form id="bannerForm" onsubmit="handlePublishBanner(event)">
+              <div class="form-group">
+                <label class="form-label">1. رفع صورة من الجهاز (Upload Image)</label>
+                <input type="file" id="bannerFileInput" class="form-control" accept="image/*" onchange="handleUploadBannerImage(event)">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">أو ضع رابط الصورة مباشرة (Cloudinary Image URL)</label>
+                <input type="text" id="bannerImageUrl" class="form-control" placeholder="https://res.cloudinary.com/..." required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">2. وجهة النقر عند الضغط على البانر (Click Target Action)</label>
+                <select id="bannerTargetAction" class="form-control">
+                  <option value="store">فتح المتجر (Store Screen)</option>
+                  <option value="solo_games">فتح قائمة الألعاب الفردية (Solo Games Menu)</option>
+                  <option value="create_room">فتح إنشاء غرفة جديدة (Create Room Screen)</option>
+                  <option value="url">فتح رابط خارجي (External Web URL)</option>
+                  <option value="screen">فتح شاشة مخصصة بالاسم (Custom App Route)</option>
+                  <option value="none">عرض فقط (بدون توجيه)</option>
+                </select>
+              </div>
+
+              <div class="form-group" id="targetUrlWrap">
+                <label class="form-label">الرابط الخارجي أو اسم الشاشة المخصصة (اختياري)</label>
+                <input type="text" id="bannerTargetUrl" class="form-control" placeholder="مثال: https://mywebsite.com أو Store">
+              </div>
+
+              <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;">
+                <i data-lucide="plus" style="width: 16px; height: 16px;"></i> إضافة الإعلان للقائمة
+              </button>
+            </form>
+          </div>
+
+          <!-- Banners Order List Table -->
+          <div class="content-card">
+            <div class="card-title"><i data-lucide="list" style="color: var(--primary-violet);"></i> قائمة البانرات المعروضة وترتيبها بالتطبيق</div>
+
+            <div class="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>الترتيب</th>
+                    <th>معاينة الصورة</th>
+                    <th>وجهة النقر</th>
+                    <th>الحالة</th>
+                    <th>إجراءات الترتيب والتحكم</th>
+                  </tr>
+                </thead>
+                <tbody id="bannersTableBody">
+                  <tr><td colspan="5" style="text-align: center; color: var(--ink-muted);">جاري التحميل...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: USER MANAGEMENT & BANS -->
+      <div id="tab-users" class="section-view">
+        <div class="page-title-row">
+          <h1 class="page-title">إدارة اللاعبين والحظر</h1>
+          <p class="page-desc">البحث عن حسابات اللاعبين، إهداء العملات، وتطبيق الحظر للحسابات المخالفة</p>
+        </div>
+
+        <div class="content-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px;">
+            <div style="flex: 1; max-width: 400px;">
+              <input type="text" id="userSearchInput" class="form-control" placeholder="ابحث باسم المستخدم أو البريد الإلكتروني..." oninput="handleSearchUsers()">
+            </div>
+            <button class="btn btn-primary" onclick="openGrantModal()">
+              <i data-lucide="gift" style="width: 16px; height: 16px;"></i> إهداء كوينز/جواهر للاعب
+            </button>
+          </div>
+
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>اسم المستخدم</th>
+                  <th>البريد الإلكتروني</th>
+                  <th>الكوينز</th>
+                  <th>الجواهر</th>
+                  <th>الاتصال</th>
+                  <th>الحالة</th>
+                  <th>سبب الحظر</th>
+                  <th>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody">
+                <tr><td colspan="8" style="text-align: center; color: var(--ink-muted);">جاري التحميل...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: AI MONITORING & QUOTA LIMITS -->
+      <div id="tab-ai" class="section-view">
+        <div class="page-title-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h1 class="page-title">مراقبة محرك ومزودي الذكاء الاصطناعي (AI Quota Monitor)</h1>
+            <p class="page-desc">متابعة استهلاك ومعدل النسبة المتبقية والحد الأقصى اليومي (Quota Limits) ومواعيد فك الحظر/الكوتا لكل المزودين المعتمدين</p>
+          </div>
+          <button class="btn btn-primary" onclick="loadAiStats(true)" id="btnProbeAi" style="display: inline-flex; align-items: center; gap: 8px;">
+            <i data-lucide="refresh-cw"></i> فحص المزودين والكوتا الآن
+          </button>
+        </div>
+
+        <!-- Top Summary Metric Cards -->
+        <div class="stats-grid" style="margin-bottom: 24px;">
+          <div class="stat-card">
+            <div class="icon-wrap" style="background: rgba(108, 75, 216, 0.12); color: var(--primary-violet);">
+              <i data-lucide="activity" style="width: 24px; height: 24px;"></i>
+            </div>
+            <div class="stat-num" id="aiTotalRequestsToday">0</div>
+            <div class="stat-label">إجمالي الطلبات المستهلكة اليوم</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="icon-wrap" style="background: rgba(16, 185, 129, 0.12); color: var(--accent-emerald);">
+              <i data-lucide="shield-check" style="width: 24px; height: 24px;"></i>
+            </div>
+            <div class="stat-num" id="aiTotalRemainingToday">0</div>
+            <div class="stat-label">الكوتا المتبقية اليوم (فاضلي كام)</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="icon-wrap" style="background: rgba(245, 158, 11, 0.12); color: var(--accent-gold);">
+              <i data-lucide="bar-chart-2" style="width: 24px; height: 24px;"></i>
+            </div>
+            <div class="stat-num" id="aiOverallUsagePercent">0%</div>
+            <div class="stat-label">نسبة الاستهلاك الإجمالية</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="icon-wrap" style="background: rgba(41, 184, 176, 0.12); color: var(--accent-turquoise);">
+              <i data-lucide="cpu" style="width: 24px; height: 24px;"></i>
+            </div>
+            <div class="stat-num" id="aiActiveProvidersCount">0 / 0</div>
+            <div class="stat-label">المزودين المتاحين حالياً</div>
+          </div>
+        </div>
+
+        <div class="stats-grid" id="aiProvidersGrid">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- TAB 5: STORE MANAGEMENT -->
+      <div id="tab-store" class="section-view">
+        <div class="page-title-row">
+          <h1 class="page-title">إدارة عناصر وعروض المتجر والتخفيضات</h1>
+          <p class="page-desc">إضافة وإدارة أسعار وعروض التخفيضات للأفاتارات، الإطارات، والتأثيرات</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 360px 1fr; gap: 24px;">
+          <!-- Add Store Item Form -->
+          <div class="content-card">
+            <div class="card-title"><i data-lucide="plus-circle" style="color: var(--primary-violet);"></i> إضافة عنصر جديد للمتجر</div>
+            <form onsubmit="handleCreateStoreItem(event)">
+              <div class="form-group">
+                <label class="form-label">اسم العنصر</label>
+                <input type="text" id="storeItemName" class="form-control" placeholder="مثال: إطار الفراعنة الأسطوري" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">النوع (Type)</label>
+                <select id="storeItemType" class="form-control">
+                  <option value="avatar">أفاتار (Avatar)</option>
+                  <option value="border">إطار (Border)</option>
+                  <option value="theme">ثيم (Theme)</option>
+                  <option value="effect">تأثير (Effect)</option>
+                  <option value="buzzer">صوت جرس (Buzzer)</option>
+                </select>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                  <label class="form-label">سعر البيع بالكوينز</label>
+                  <input type="number" id="storeItemPrice" class="form-control" value="100" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">السعر الأصلي (قبل الخصم)</label>
+                  <input type="number" id="storeItemOriginalPrice" class="form-control" placeholder="مثال: 200">
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                  <label class="form-label">سعر البيع بالجواهر</label>
+                  <input type="number" id="storeItemGemPrice" class="form-control" placeholder="10">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">سعر الجواهر الأصلي</label>
+                  <input type="number" id="storeItemOriginalGemPrice" class="form-control" placeholder="20">
+                </div>
+              </div>
+              <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="storeItemOnSale" style="width: 16px; height: 16px; accent-color: var(--primary-violet);">
+                <label for="storeItemOnSale" style="font-weight: 700; font-size: 12px; cursor: pointer;">تفعيل عروض التخفيضات 🏷️</label>
+              </div>
+              <div class="form-group">
+                <label class="form-label">رابط الصورة (Image URL)</label>
+                <input type="text" id="storeItemImage" class="form-control" placeholder="https://..." required>
+              </div>
+              <button type="submit" class="btn btn-primary" style="width: 100%;">إضافة للمتجر</button>
+            </form>
+          </div>
+
+          <!-- Store Products & Active Discounts Table -->
+          <div class="content-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div class="card-title" style="margin-bottom: 0;"><i data-lucide="shopping-bag" style="color: var(--primary-violet);"></i> قائمة عروض ومنتجات المتجر الحالية</div>
+              <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="loadStoreItems()">تحديث القائمة</button>
+            </div>
+            <div class="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>الصورة والاسم</th>
+                    <th>النوع</th>
+                    <th>السعر والعرض (الكوينز / الجواهر)</th>
+                    <th>الحالة والعرض</th>
+                    <th>الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody id="storeItemsTableBody">
+                  <!-- JS rendered -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 6: REPORTED QUESTIONS -->
+      <div id="tab-reports" class="section-view">
+        <div class="page-title-row">
+          <h1 class="page-title">بلاغات وتصحيح الأسئلة المرفوعة</h1>
+          <p class="page-desc">مراجعة وتعديل وتصفية الأسئلة التي قام اللاعبون بالإبلاغ عنها داخل اللعبة</p>
+        </div>
+
+        <div class="content-card">
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>عدد البلاغات</th>
+                  <th>نص السؤال</th>
+                  <th>القسم</th>
+                  <th>الإجابة الصحيحة</th>
+                  <th>الصعوبة</th>
+                  <th>الإجراءات والتصحيح</th>
+                </tr>
+              </thead>
+              <tbody id="reportsTableBody">
+                <tr><td colspan="6" style="text-align: center; color: var(--ink-muted);">جاري التحميل...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 7: USER FEEDBACKS & COMPLAINTS -->
+      <div id="tab-feedbacks" class="section-view">
+        <div class="page-title-row">
+          <h1 class="page-title">شكاوى واقتراحات اللاعبين</h1>
+          <p class="page-desc">رسائل الشكاوى والملاحظات المرسلة مباشرة من اللاعبين عبر التطبيق</p>
+        </div>
+
+        <div class="content-card">
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>اللاعب</th>
+                  <th>محتوى الرسالة / الشكوى</th>
+                  <th>تاريخ الإرسال</th>
+                  <th>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="feedbacksTableBody">
+                <tr><td colspan="4" style="text-align: center; color: var(--ink-muted);">جاري التحميل...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 8: QUESTIONS LIBRARY & MANAGER -->
+      <div id="tab-questions" class="section-view">
+        <div class="page-title-row" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h1 class="page-title">مكتبة وإدارة أسئلة اللعبة</h1>
+            <p class="page-desc">تصفح وإضافة وتعديل وحذف الأسئلة في كافة أقسام وأطوار اللعبة</p>
+          </div>
+          <button class="btn btn-primary" onclick="openAddQuestionModal()">
+            <i data-lucide="plus" style="width: 16px; height: 16px;"></i> إضافة سؤال جديد
+          </button>
+        </div>
+
+        <div class="content-card">
+          <div style="display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 250px;">
+              <input type="text" id="questionSearchInput" class="form-control" placeholder="ابحث في نص السؤال أو الإجابة..." oninput="handleSearchQuestions()">
+            </div>
+            <div style="width: 220px;">
+              <select id="questionCategoryFilter" class="form-control" onchange="handleSearchQuestions()">
+                <option value="">جميع الأقسام</option>
+                <option value="general-knowledge">معلومات عامة</option>
+                <option value="flags">أعلام وأجوبة</option>
+                <option value="dont-say-my-word">ممنوع تقول الكلمة</option>
+                <option value="reversed-words">كلمات معكوسة</option>
+                <option value="describe-it">اشرحها وتحدّى</option>
+                <option value="word-in-song">كلمة في أغنية</option>
+                <option value="egyptian-movies">أفلام مصرية</option>
+                <option value="predict-questions">توقّع ووقّع</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>السؤال</th>
+                  <th>القسم</th>
+                  <th>الإجابة الصحيحة</th>
+                  <th>الصعوبة</th>
+                  <th>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="questionsTableBody">
+                <tr><td colspan="5" style="text-align: center; color: var(--ink-muted);">جاري التحميل...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- BAN USER MODAL -->
+  <div id="banModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="card-title" style="color: var(--accent-coral);"><i data-lucide="user-x"></i> حظر حساب لاعب</div>
+      <input type="hidden" id="banTargetUserId">
+      <div class="form-group">
+        <label class="form-label">سبب الحظر</label>
+        <textarea id="banReasonInput" class="form-control" rows="3" placeholder="اكتب سبب الحظر للاعب..."></textarea>
+      </div>
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="btn btn-secondary" onclick="closeBanModal()">إلغاء</button>
+        <button class="btn btn-danger" onclick="confirmBanUser()">تأكيد الحظر</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GRANT COINS MODAL -->
+  <div id="grantModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="card-title"><i data-lucide="gift" style="color: var(--primary-violet);"></i> إهداء كوينز/جواهر للاعب</div>
+      <div class="form-group">
+        <label class="form-label">اسم المستخدم</label>
+        <input type="text" id="grantUsernameInput" class="form-control" placeholder="اسم المستخدم..." required>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div class="form-group">
+          <label class="form-label">عدد الكوينز</label>
+          <input type="number" id="grantCoinsInput" class="form-control" value="1000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">عدد الجواهر</label>
+          <input type="number" id="grantGemsInput" class="form-control" value="50">
+        </div>
+      </div>
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="btn btn-secondary" onclick="closeGrantModal()">إلغاء</button>
+        <button class="btn btn-primary" onclick="confirmGrantUser()">إرسال الهدايا</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT QUESTION MODAL -->
+  <div id="questionModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 550px;">
+      <div class="card-title" id="questionModalTitle"><i data-lucide="help-circle" style="color: var(--primary-violet);"></i> إضافة سؤال جديد</div>
+      <input type="hidden" id="editQuestionId">
+      <div class="form-group">
+        <label class="form-label">نص السؤال</label>
+        <textarea id="qTextInput" class="form-control" rows="3" placeholder="اكتب نص السؤال هنا..." required></textarea>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div class="form-group">
+          <label class="form-label">القسم (Category)</label>
+          <select id="qCategoryInput" class="form-control">
+            <option value="general-knowledge">معلومات عامة</option>
+            <option value="flags">أعلام وأجوبة</option>
+            <option value="dont-say-my-word">ممنوع تقول الكلمة</option>
+            <option value="reversed-words">كلمات معكوسة</option>
+            <option value="describe-it">اشرحها وتحدّى</option>
+            <option value="word-in-song">كلمة في أغنية</option>
+            <option value="egyptian-movies">أفلام مصرية</option>
+            <option value="predict-questions">توقّع ووقّع</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">مستوى الصعوبة</label>
+          <select id="qDifficultyInput" class="form-control">
+            <option value="easy">سهل (Easy)</option>
+            <option value="medium" selected>متوسط (Medium)</option>
+            <option value="hard">صعب (Hard)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">الإجابة الصحيحة الرئيسية</label>
+        <input type="text" id="qAnswerInput" class="form-control" placeholder="الإجابة الرئيسية..." required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">إجابات مقبولة إضافية (مفصولة بـ مفصلة comma)</label>
+        <input type="text" id="qAcceptedAnswersInput" class="form-control" placeholder="مثال: مصر, جمهورية مصر العربية">
+      </div>
+      <div class="form-group">
+        <label class="form-label">رابط صورة العلم / السؤال (flagImage URL)</label>
+        <input type="text" id="qFlagImageInput" class="form-control" placeholder="مثال: https://flagcdn.com/w640/eg.png">
+      </div>
+      <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px;">
+        <button class="btn btn-secondary" onclick="closeQuestionModal()">إلغاء</button>
+        <button class="btn btn-primary" onclick="saveQuestionSubmit()">حفظ السؤال</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDIT STORE ITEM MODAL -->
+  <div id="storeItemEditModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 500px;">
+      <div class="card-title" id="storeItemModalTitle"><i data-lucide="tag" style="color: var(--primary-violet);"></i> تعديل سعر وعرض المنتج</div>
+      <input type="hidden" id="editStoreItemId">
+      <div class="form-group">
+        <label class="form-label">اسم العنصر</label>
+        <input type="text" id="editStoreItemName" class="form-control" required>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div class="form-group">
+          <label class="form-label">سعر البيع بالكوينز</label>
+          <input type="number" id="editStoreItemPrice" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">السعر الأصلي قبل الخصم</label>
+          <input type="number" id="editStoreItemOriginalPrice" class="form-control" placeholder="مثال: 200">
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div class="form-group">
+          <label class="form-label">سعر الجواهر الحالي</label>
+          <input type="number" id="editStoreItemGemPrice" class="form-control" placeholder="مثال: 10">
+        </div>
+        <div class="form-group">
+          <label class="form-label">سعر الجواهر الأصلي</label>
+          <input type="number" id="editStoreItemOriginalGemPrice" class="form-control" placeholder="مثال: 20">
+        </div>
+      </div>
+      <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+        <input type="checkbox" id="editStoreItemOnSale" style="width: 18px; height: 18px; accent-color: var(--primary-violet);">
+        <label for="editStoreItemOnSale" style="font-weight: 700; font-size: 13px; cursor: pointer;">تفعيل شارة عروض التخفيضات (ON SALE 🏷️)</label>
+      </div>
+      <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+        <input type="checkbox" id="editStoreItemIsAvailable" style="width: 18px; height: 18px; accent-color: var(--accent-emerald);">
+        <label for="editStoreItemIsAvailable" style="font-weight: 700; font-size: 13px; cursor: pointer;">متاح للبيع والشراء في المتجر</label>
+      </div>
+      <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px;">
+        <button class="btn btn-secondary" onclick="closeStoreItemModal()">إلغاء</button>
+        <button class="btn btn-primary" onclick="saveStoreItemSubmit()">حفظ التعديلات</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let authToken = localStorage.getItem('buzzit_admin_token') || '';
+    let usersList = [];
+    let bannersList = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      restoreAdminSession();
+    });
+
+    async function restoreAdminSession() {
+      if (!authToken) return;
+      const response = await fetch('/api/admin/stats', { headers: { 'Authorization': 'Bearer ' + authToken } }).catch(() => null);
+      if (!response || !response.ok) {
+        localStorage.removeItem('buzzit_admin_token');
+        authToken = '';
+        return;
+      }
+      unlockAdmin(localStorage.getItem('buzzit_admin_email') || 'حساب الإدارة');
+    }
+
+    function unlockAdmin(email) {
+      document.body.classList.remove('admin-locked');
+      document.getElementById('headerAdminEmail').innerText = email;
+      loadDashboardStats(); loadBannersList(); loadUsersList(); loadAiStats();
+    }
+
+    function loginAdmin(event) {
+      event.preventDefault();
+      const email = document.getElementById('adminEmailInput').value.trim();
+      const password = document.getElementById('adminPasswordInput').value;
+      document.getElementById('loginError').innerText = '';
+      fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+      .then(async res => ({ ok: res.ok, data: await res.json() }))
+      .then(({ ok, data }) => {
+        if (!ok || !data.token || !data.user?.isAdmin) throw new Error(data.error || 'الحساب لا يملك صلاحية الإدارة.');
+        authToken = data.token;
+        localStorage.setItem('buzzit_admin_token', authToken);
+        localStorage.setItem('buzzit_admin_email', data.user.email || email);
+        unlockAdmin(data.user.email || email);
+      })
+      .catch((error) => { document.getElementById('loginError').innerText = error.message || 'تعذر تسجيل الدخول.'; });
+    }
+
+    function logoutAdmin() {
+      localStorage.removeItem('buzzit_admin_token');
+      localStorage.removeItem('buzzit_admin_email');
+      location.reload();
+    }
+
+    function switchTab(tabId, btn) {
+      document.querySelectorAll('.section-view').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+      
+      document.getElementById('tab-' + tabId).classList.add('active');
+      btn.classList.add('active');
+
+      if (tabId === 'ai') loadAiStats();
+      if (tabId === 'reports') loadReportedQuestions();
+      if (tabId === 'feedbacks') loadFeedbacks();
+      if (tabId === 'questions') loadQuestions();
+      if (tabId === 'store') loadStoreItems();
+      if (tabId === 'purchases') loadPurchases();
+      if (tabId === 'operations') loadAppSettings();
+    }
+
+    function loadDashboardStats() {
+      fetch('/api/admin/stats', {
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) return;
+        document.getElementById('statTotalUsers').innerText = data.totalUsers || 0;
+        document.getElementById('statTotalGames').innerText = data.totalGamesPlayed || 0;
+        document.getElementById('statTotalBanners').innerText = data.totalBanners || 0;
+        document.getElementById('statUptime').innerText = (data.serverUptimeSec || 0) + 's';
+        document.getElementById('statOnlineUsers').innerText = data.onlineUsers || 0;
+      })
+      .catch(console.error);
+    }
+
+    /* AI Stats & Quota Monitor */
+    function loadAiStats(force = false) {
+      const btn = document.getElementById('btnProbeAi');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '🔍 جاري فحص الكوتا والمزودين...';
+      }
+      const url = '/api/admin/ai-stats' + (force ? '?force=true' : '');
+      fetch(url, {
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(res => res.json())
+      .then(data => {
+        renderAiProviders(data?.providers || [], data);
+      })
+      .catch(() => renderAiProviders([], null))
+      .finally(() => {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="refresh-cw"></i> فحص المزودين والكوتا الآن';
+          if (window.lucide) lucide.createIcons();
+        }
+      });
+    }
+
+    function renderAiProviders(providers, fullData) {
+      if (fullData) {
+        const totalReq = fullData.totalRequestsToday || 0;
+        const totalRem = fullData.totalRemainingToday || 0;
+        const overallPct = fullData.overallUsagePercent || 0;
+        const activeCount = providers ? providers.filter(p => p.available).length : 0;
+        const totalCount = providers ? providers.length : 0;
+
+        const reqEl = document.getElementById('aiTotalRequestsToday');
+        const remEl = document.getElementById('aiTotalRemainingToday');
+        const pctEl = document.getElementById('aiOverallUsagePercent');
+        const actEl = document.getElementById('aiActiveProvidersCount');
+
+        if (reqEl) reqEl.innerText = totalReq.toLocaleString('ar-EG');
+        if (remEl) remEl.innerText = totalRem.toLocaleString('ar-EG');
+        if (pctEl) pctEl.innerText = overallPct + '%';
+        if (actEl) actEl.innerText = activeCount + ' / ' + totalCount;
+      }
+
+      const grid = document.getElementById('aiProvidersGrid');
+      if (!grid) return;
+      if (!providers || !providers.length) {
+        grid.innerHTML = '<div class="content-card" style="grid-column: 1 / -1; text-align: center; padding: 24px;">لا يوجد مزود ذكاء اصطناعي مُعد حالياً على السيرفر (تأكد من إعداد مفاتيح API الخاصة بـ Gemini أو Groq أو Cerebras أو Cloudflare في ملف .env).</div>';
+        return;
+      }
+
+      const now = Date.now();
+      grid.innerHTML = providers.map(p => {
+        const isAvailable = p.available && (!p.retryAt || p.retryAt <= now);
+        const usagePct = p.usagePercent || 0;
+        const requestsToday = p.requestsToday || 0;
+        const dailyLimit = p.dailyLimit || 1500;
+        const remainingToday = p.remainingToday != null ? p.remainingToday : Math.max(0, dailyLimit - requestsToday);
+
+        let barColor = 'var(--accent-emerald)';
+        if (usagePct >= 70 && usagePct < 90) barColor = 'var(--accent-gold)';
+        else if (usagePct >= 90) barColor = 'var(--accent-coral)';
+
+        let quotaCountdownHtml = '';
+        if (p.retryAt && p.retryAt > now) {
+          const remainingSec = Math.ceil((p.retryAt - now) / 1000);
+          const timeStr = new Date(p.retryAt).toLocaleTimeString('ar-EG');
+          quotaCountdownHtml = `
+            <div style="font-size: 12px; color: var(--accent-coral); font-weight: 700; margin-top: 10px; background: rgba(255,83,112,0.08); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,83,112,0.2);">
+              ⏱️ تجاوز الكوتا / معدل الطلبات — يتاح مجدداً خلال <strong>${remainingSec} ثانية</strong> (عند ${timeStr})
+            </div>
+          `;
+        }
+
+        const lastCheckStr = p.lastCheckedAt 
+          ? `${new Date(p.lastCheckedAt).toLocaleTimeString('ar-EG')} (${Math.round((now - p.lastCheckedAt) / 1000)} ثانية مضت)` 
+          : 'لم يُفحص بعد (اضغط فحص الآن)';
+
+        const providerDisplayName = p.id === 'google' ? 'Google Gemini' : (p.id.charAt(0).toUpperCase() + p.id.slice(1));
+
+        return `
+          <div class="stat-card" style="position: relative; border: 2px solid ${isAvailable ? 'var(--border-line)' : 'rgba(255,83,112,0.35)'}; padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+              <span class="badge-status ${isAvailable ? 'badge-active' : 'badge-banned'}" style="font-size: 12px; font-weight: 800;">
+                ${isAvailable ? '🟢 متاح وجاهز' : '🔴 متوقف مؤقتاً (Cooling Down)'}
+              </span>
+              <span style="font-size: 12px; font-weight: 800; color: var(--primary-violet); background: rgba(108,75,216,0.08); padding: 4px 10px; border-radius: 8px;">
+                ${p.lastLatencyMs == null ? '—' : '⚡ ' + p.lastLatencyMs + 'ms'}
+              </span>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <div style="font-size: 20px; font-weight: 900; color: var(--ink-primary);">
+                ${providerDisplayName}
+              </div>
+              <span style="font-size: 12px; font-weight: 800; color: ${barColor}; background: rgba(0,0,0,0.04); padding: 2px 8px; border-radius: 6px;">
+                ${usagePct}% مستهلك
+              </span>
+            </div>
+
+            <!-- Quota Limit Bar & Info (فاضلي كام من كام) -->
+            <div style="background: #F4F1FA; padding: 12px 14px; border-radius: 12px; margin-bottom: 14px; border: 1px solid var(--border-line);">
+              <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: var(--ink-primary); margin-bottom: 6px;">
+                <span>🎯 الحد اليومي (اللميت): <strong>${requestsToday.toLocaleString('ar-EG')} / ${dailyLimit.toLocaleString('ar-EG')} طلب</strong></span>
+                <span style="color: var(--accent-emerald);">متبقي: <strong>${remainingToday.toLocaleString('ar-EG')}</strong></span>
+              </div>
+              <div style="width: 100%; height: 10px; background: rgba(63,42,115,0.1); border-radius: 6px; overflow: hidden;">
+                <div style="width: ${usagePct}%; height: 100%; background: ${barColor}; transition: width 0.4s ease; border-radius: 6px;"></div>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+              <div style="font-size: 12px; font-weight: 700; color: var(--accent-emerald); background: rgba(16,185,129,0.08); padding: 6px 10px; border-radius: 8px;">
+                ✅ ناجحة: <strong>${(p.successfulToday || 0).toLocaleString('ar-EG')}</strong>
+              </div>
+              <div style="font-size: 12px; font-weight: 700; color: var(--accent-coral); background: rgba(255,83,112,0.08); padding: 6px 10px; border-radius: 8px;">
+                ❌ فاشلة: <strong>${(p.failedToday || 0).toLocaleString('ar-EG')}</strong>
+              </div>
+            </div>
+
+            <div style="font-size: 12px; color: var(--ink-muted); font-weight: 600; margin-top: 6px;">
+              🔍 آخر فحص: <strong>${lastCheckStr}</strong>
+            </div>
+
+            ${quotaCountdownHtml}
+            ${p.lastError ? `
+              <div style="font-size: 11px; color: var(--accent-coral); margin-top: 10px; word-break: break-word; font-weight: 600; background: rgba(255,83,112,0.06); padding: 8px 10px; border-radius: 8px;">
+                ⚠️ ${p.lastError.reason || p.lastError.code || 'خطأ في الاتصال'} ${p.lastError.status ? `(Status ${p.lastError.status})` : ''}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    /* Banners List & Reordering */
+    function loadBannersList() {
+      fetch('/api/admin/announcements/all', {
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(res => res.json())
+      .then(data => {
+        bannersList = Array.isArray(data) ? data : [];
+        renderBannersTable(bannersList);
+      })
+      .catch(console.error);
+    }
+
+    function renderBannersTable(list) {
+      const tbody = document.getElementById('bannersTableBody');
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--ink-muted);">لا توجد بانرات مضافة حالياً</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map((b, idx) => `
+        <tr>
+          <td style="font-weight: 800; font-family: 'Inter', sans-serif;">#${idx + 1}</td>
+          <td><img src="${b.imageUrl}" class="banner-thumb" alt="Banner" /></td>
+          <td>
+            <span style="font-weight: 700; color: var(--primary-violet);">
+              ${b.targetAction === 'store' ? 'المتجر (Store)' :
+                b.targetAction === 'solo_games' ? 'الألعاب الفردية (Solo Games)' :
+                b.targetAction === 'create_room' ? 'إنشاء غرفة (Create Room)' :
+                b.targetAction === 'url' ? 'رابط خارجي (' + (b.targetUrl || '') + ')' :
+                b.targetAction === 'screen' ? 'شاشة (' + (b.targetUrl || '') + ')' : 'عرض فقط'}
+            </span>
+          </td>
+          <td>
+            ${b.isActive 
+              ? `<span class="badge-status badge-active">معروض</span>` 
+              : `<span class="badge-status badge-banned">معطل</span>`}
+          </td>
+          <td>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-secondary" style="padding: 6px 10px;" onclick="moveBannerOrder(${idx}, -1)" ${idx === 0 ? 'disabled style="opacity:0.3;"' : ''}>أعلى</button>
+              <button class="btn btn-secondary" style="padding: 6px 10px;" onclick="moveBannerOrder(${idx}, 1)" ${idx === list.length - 1 ? 'disabled style="opacity:0.3;"' : ''}>أسفل</button>
+              <button class="btn btn-secondary" style="padding: 6px 10px;" onclick="toggleBannerActive('${b._id}')">تغيير</button>
+              <button class="btn btn-danger" style="padding: 6px 10px;" onclick="deleteBanner('${b._id}')">حذف</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function moveBannerOrder(index, direction) {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= bannersList.length) return;
+
+      const temp = bannersList[index];
+      bannersList[index] = bannersList[targetIndex];
+      bannersList[targetIndex] = temp;
+
+      const payloadItems = bannersList.map((item, idx) => ({ id: item._id, order: idx }));
+
+      fetch('/api/admin/announcements/reorder', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify({ items: payloadItems })
+      })
+      .then(res => res.json())
+      .then(() => {
+        renderBannersTable(bannersList);
+      });
+    }
+
+    function toggleBannerActive(id) {
+      fetch('/api/admin/announcements/' + id + '/toggle', {
+        method: 'PUT',
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(res => res.json())
+      .then(() => loadBannersList());
+    }
+
+    function deleteBanner(id) {
+      if (!confirm('هل أنت تأكد من حذف هذا البانر الإعلاني؟')) return;
+      fetch('/api/admin/announcements/' + id, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(res => res.json())
+      .then(() => loadBannersList());
+    }
+
+    function handleUploadBannerImage(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('image', file);
+
+      fetch('/api/admin/upload-image', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + authToken },
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.url) {
+          document.getElementById('bannerImageUrl').value = data.url;
+          alert('تم رفع صورة البانر بنجاح إلى Cloudinary');
+        } else {
+          alert('فشل رفع الصورة: ' + (data.error || 'خطأ'));
+        }
+      });
+    }
+
+    function handlePublishBanner(e) {
+      e.preventDefault();
+      const payload = {
+        imageUrl: document.getElementById('bannerImageUrl').value,
+        targetAction: document.getElementById('bannerTargetAction').value,
+        targetUrl: document.getElementById('bannerTargetUrl').value,
+      };
+
+      fetch('/api/admin/announcements', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.banner) {
+          alert('تم إضافة البانر الإعلاني بنجاح إلى التطبيق');
+          document.getElementById('bannerImageUrl').value = '';
+          loadBannersList();
+          loadDashboardStats();
+        } else {
+          alert('فشل الإضافة: ' + (data.error || 'خطأ'));
+        }
+      });
+    }
+
+    /* Users Handlers */
+    function loadUsersList() {
+      fetch('/api/admin/users/list', {
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(res => res.json())
+      .then(data => {
+        usersList = data.users || [];
+        renderUsersTable(usersList);
+      })
+      .catch(console.error);
+    }
+
+    function renderUsersTable(list) {
+      const tbody = document.getElementById('usersTableBody');
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--ink-muted);">لا يوجد لاعبين مطابقين لهذا البحث</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(u => {
+        const initial = (u.username || 'U').charAt(0).toUpperCase();
+        const avatarBubble = `<div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #6C4BD8, #3F2A73); color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 14px; margin-left: 10px; flex-shrink: 0; border: 2px solid #FFF; box-shadow: 0 2px 6px rgba(108,75,216,0.25);">${initial}</div>`;
+        return `
+          <tr>
+            <td style="font-weight: 800;">
+              <div style="display: flex; align-items: center;">
+                ${avatarBubble}
+                <span>${u.username} ${u.isAdmin ? '<span class="badge-status badge-active" style="font-size: 10px; margin-right: 4px; background: rgba(108,75,216,0.15); color: var(--primary-violet);">آدمن</span>' : ''}</span>
+              </div>
+            </td>
+            <td>${u.email}</td>
+            <td style="color: var(--accent-gold); font-weight: 800;">${u.coins || 0}</td>
+            <td style="color: var(--accent-turquoise); font-weight: 800;">${u.gems || 0}</td>
+            <td>${u.isOnline ? '<span class="badge-status badge-active">متصل الآن</span>' : '<span style="color:var(--ink-muted);">غير متصل</span>'}</td>
+            <td>
+              ${u.isBanned 
+                ? `<span class="badge-status badge-banned">محظور</span>` 
+                : `<span class="badge-status badge-active">نشط</span>`}
+            </td>
+            <td style="color: var(--ink-muted); font-size: 12px;">${u.banReason || '-'}</td>
+            <td>
+              ${u.isBanned
+                ? `<button class="btn btn-success" style="padding: 6px 12px; font-size: 12px;" onclick="handleUnbanUser('${u._id}')">فك الحظر</button>`
+                : `<button class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;" onclick="openBanModal('${u._id}')">حظر</button>`
+              }
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function handleSearchUsers() {
+      const q = document.getElementById('userSearchInput').value.toLowerCase().trim();
+      const filtered = usersList.filter(u => u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+      renderUsersTable(filtered);
+    }
+
+    function openBanModal(userId) {
+      document.getElementById('banTargetUserId').value = userId;
+      document.getElementById('banModal').classList.add('active');
+    }
+
+    function closeBanModal() {
+      document.getElementById('banModal').classList.remove('active');
+    }
+
+    function confirmBanUser() {
+      const userId = document.getElementById('banTargetUserId').value;
+      const reason = document.getElementById('banReasonInput').value;
+
+      fetch('/api/admin/users/ban', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify({ userId, isBanned: true, banReason: reason })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message || 'تم حظر المستخدم');
+        closeBanModal();
+        loadUsersList();
+      });
+    }
+
+    function handleUnbanUser(userId) {
+      if (!confirm('هل أنت تأكد من فك حظر هذا اللاعب؟')) return;
+      fetch('/api/admin/users/ban', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify({ userId, isBanned: false })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message || 'تم فك الحظر');
+        loadUsersList();
+      });
+    }
+
+    function openGrantModal() {
+      document.getElementById('grantModal').classList.add('active');
+    }
+
+    function closeGrantModal() {
+      document.getElementById('grantModal').classList.remove('active');
+    }
+
+    function confirmGrantUser() {
+      const username = document.getElementById('grantUsernameInput').value;
+      const coins = Number(document.getElementById('grantCoinsInput').value || 0);
+      const gems = Number(document.getElementById('grantGemsInput').value || 0);
+
+      fetch('/api/admin/users/grant', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify({ username, coins, gems })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message || 'تم المنح بنجاح');
+        closeGrantModal();
+        loadUsersList();
+      });
+    }
+
+    /* 🛍️ STORE ITEMS HANDLERS */
+    let storeItemsCache = [];
+
+    function loadStoreItems() {
+      fetch('/api/admin/store/items', {
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(res => res.json())
+      .then(data => {
+        storeItemsCache = Array.isArray(data) ? data : [];
+        renderStoreItems(storeItemsCache);
+      })
+      .catch(console.error);
+    }
+
+    function getStoreItemImageHtml(item) {
+      const imgUrl = (item.imageUrl || '').trim();
+      const name = item.name || 'عنصر';
+      const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=6C4BD8&color=fff&size=80`;
+
+      if (imgUrl.startsWith('http://') || imgUrl.startsWith('https://') || imgUrl.startsWith('data:') || imgUrl.startsWith('/')) {
+        return `<img src="${imgUrl}" alt="${name}" onerror="this.onerror=null; this.src='${fallbackUrl}';" style="width: 38px; height: 38px; object-fit: contain; border-radius: 8px; border: 1px solid var(--border-line-bold); background: #fafafa; margin-left: 10px; flex-shrink: 0;" />`;
+      }
+
+      const typeIcons = { avatar: '👤', border: '🖼️', theme: '🎨', effect: '✨', cover: '🌆', buzzer: '🔔' };
+      const icon = typeIcons[item.type] || '🎁';
+      return `<div style="width: 38px; height: 38px; border-radius: 8px; background: linear-gradient(135deg, #6C4BD8, #5435B9); color: #FFF; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; margin-left: 10px; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" title="${imgUrl || name}"><span>${icon}</span></div>`;
+    }
+
+    function renderStoreItems(list) {
+      const tbody = document.getElementById('storeItemsTableBody');
+      if (!tbody) return;
+
+      if (!list || !list.length) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--ink-muted);">لا توجد عناصر مسجلة في المتجر حالياً</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(item => {
+        const typeLabels = { avatar: 'أفاتار', border: 'إطار', theme: 'ثيم', effect: 'تأثير', cover: 'غلاف', buzzer: 'جرس' };
+        const typeBadge = typeLabels[item.type] || item.type;
+        const imgHtml = getStoreItemImageHtml(item);
+
+        let priceHtml = '';
+        if (item.price != null) {
+          if (item.onSale && item.originalPrice && item.originalPrice > item.price) {
+            priceHtml += `<div style="display: flex; align-items: center; gap: 6px;"><span style="font-weight: 900; color: var(--accent-emerald); font-size: 13px;">${item.price} كوينز</span><span style="text-decoration: line-through; color: var(--ink-faint); font-size: 11px;">${item.originalPrice}</span></div>`;
+          } else {
+            priceHtml += `<span style="font-weight: 800; color: var(--ink-primary); font-size: 13px;">${item.price} كوينز</span>`;
+          }
+        }
+        if (item.gemPrice != null) {
+          if (priceHtml) priceHtml += `<br>`;
+          if (item.onSale && item.originalGemPrice && item.originalGemPrice > item.gemPrice) {
+            priceHtml += `<div style="display: flex; align-items: center; gap: 6px;"><span style="font-weight: 900; color: var(--primary-violet); font-size: 12px;">💎 ${item.gemPrice} جواهر</span><span style="text-decoration: line-through; color: var(--ink-faint); font-size: 11px;">${item.originalGemPrice}</span></div>`;
+          } else {
+            priceHtml += `<span style="font-weight: 800; color: var(--primary-violet); font-size: 12px;">💎 ${item.gemPrice} جواهر</span>`;
+          }
+        }
+
+        const saleBadge = item.onSale ? `<span class="badge-status badge-active" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); font-size: 11px; font-weight: 800; margin-right: 6px;">🏷️ خصم</span>` : '';
+        const availBadge = item.isAvailable !== false
+          ? `<span class="badge-status badge-active" style="font-size: 11px;">متاح</span>`
+          : `<span class="badge-status badge-banned" style="font-size: 11px;">مخفي</span>`;
+
+        return `
+          <tr>
+            <td style="font-weight: 800;">
+              <div style="display: flex; align-items: center;">
+                ${imgHtml}
+                <span>${item.name}</span>
+              </div>
+            </td>
+            <td><span class="badge-status badge-active" style="background: rgba(108,75,216,0.1); color: var(--primary-violet); font-size: 11px; font-weight: 800;">${typeBadge}</span></td>
+            <td>${priceHtml}</td>
+            <td>${availBadge} ${saleBadge}</td>
+            <td>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;" onclick='openEditStoreItemModal(${JSON.stringify(item).replace(/'/g, "&apos;")})'>تعديل السعر</button>
+                <button class="btn btn-danger" style="padding: 5px 10px; font-size: 12px;" onclick="deleteStoreItem('${item._id}')">حذف</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function handleCreateStoreItem(e) {
+      e.preventDefault();
+      const payload = {
+        name: document.getElementById('storeItemName').value.trim(),
+        type: document.getElementById('storeItemType').value,
+        price: document.getElementById('storeItemPrice').value,
+        originalPrice: document.getElementById('storeItemOriginalPrice').value,
+        gemPrice: document.getElementById('storeItemGemPrice').value,
+        originalGemPrice: document.getElementById('storeItemOriginalGemPrice').value,
+        onSale: document.getElementById('storeItemOnSale').checked,
+        imageUrl: document.getElementById('storeItemImage').value.trim(),
+      };
+
+      fetch('/api/admin/store/item', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message || 'تمت إضافة العنصر للمتجر بنجاح');
+        loadStoreItems();
+      });
+    }
+
+    function openEditStoreItemModal(item) {
+      document.getElementById('editStoreItemId').value = item._id;
+      document.getElementById('editStoreItemName').value = item.name || '';
+      document.getElementById('editStoreItemPrice').value = item.price ?? '';
+      document.getElementById('editStoreItemOriginalPrice').value = item.originalPrice ?? '';
+      document.getElementById('editStoreItemGemPrice').value = item.gemPrice ?? '';
+      document.getElementById('editStoreItemOriginalGemPrice').value = item.originalGemPrice ?? '';
+      document.getElementById('editStoreItemOnSale').checked = !!item.onSale;
+      document.getElementById('editStoreItemIsAvailable').checked = item.isAvailable !== false;
+      document.getElementById('storeItemEditModal').classList.add('active');
+    }
+
+    function closeStoreItemModal() {
+      document.getElementById('storeItemEditModal').classList.remove('active');
+    }
+
+    function saveStoreItemSubmit() {
+      const id = document.getElementById('editStoreItemId').value;
+      const payload = {
+        name: document.getElementById('editStoreItemName').value.trim(),
+        price: document.getElementById('editStoreItemPrice').value,
+        originalPrice: document.getElementById('editStoreItemOriginalPrice').value,
+        gemPrice: document.getElementById('editStoreItemGemPrice').value,
+        originalGemPrice: document.getElementById('editStoreItemOriginalGemPrice').value,
+        onSale: document.getElementById('editStoreItemOnSale').checked,
+        isAvailable: document.getElementById('editStoreItemIsAvailable').checked,
+      };
+
+      fetch('/api/admin/store/item/' + id, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message || 'تم تحديث عنصر المتجر بنجاح!');
+        closeStoreItemModal();
+        loadStoreItems();
+      });
+    }
+
+    function deleteStoreItem(id) {
+      if (!confirm('هل أنت تأكد من حذف هذا العنصر نهائياً من المتجر؟')) return;
+      fetch('/api/admin/store/item/' + id, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message || 'تم حذف العنصر بنجاح.');
+        loadStoreItems();
+      });
+    }
+
+    function handleCreateCoupon(e) {
+      e.preventDefault();
+      const payload = {
+        code: document.getElementById('couponCode').value,
+        discountPercent: document.getElementById('couponDiscount').value,
+        maxUses: document.getElementById('couponMaxUses').value,
+      };
+
+      fetch('/api/admin/coupons', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message || 'تم إنشاء الكوبون بنجاح');
+      });
+    }
+
+    /* 🚩 REPORTED QUESTIONS HANDLERS */
+    function loadReportedQuestions() {
+      fetch('/api/admin/questions/reported', {
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(res => res.json())
+      .then(data => {
+        const list = Array.isArray(data) ? data : [];
+        renderReportedQuestions(list);
+      })
+      .catch(console.error);
+    }
+
+    function renderReportedQuestions(list) {
+      const tbody = document.getElementById('reportsTableBody');
+      if (!list || !list.length) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--ink-muted);">لا توجد أسئلة مُبلغ عنها حالياً 🎉</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(q => {
+        const flagImgUrl = q.flagImage || (q.category === 'flags' && q.text && q.text.startsWith('http') ? q.text : '');
+        const imgHtml = flagImgUrl
+          ? `<img src="${flagImgUrl}" alt="علم" style="width: 44px; height: 30px; object-fit: contain; border-radius: 6px; border: 1.5px solid var(--border-line-bold); background: #ffffff; flex-shrink: 0; margin-left: 10px;" />`
+          : '';
+
+        return `
+          <tr>
+            <td><span class="badge-status badge-banned" style="font-size: 13px; font-weight: 800;">${q.reportCount || 0} بلاغ</span></td>
+            <td style="font-weight: 700; max-width: 360px;">
+              <div style="display: flex; align-items: center;">
+                ${imgHtml}
+                <span>${q.text}</span>
+              </div>
+            </td>
+            <td><span class="badge-status badge-active" style="font-size: 11px;">${q.category}</span></td>
+            <td style="color: var(--accent-emerald); font-weight: 800;">${q.answer}</td>
+            <td style="font-size: 12px; font-weight: 700; color: var(--ink-muted);">${q.difficulty || 'medium'}</td>
+            <td>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;" onclick='openEditQuestion(${JSON.stringify(q).replace(/'/g, "&apos;")})'>تعديل</button>
+                <button class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;" onclick="clearQuestionReports('${q._id}')">تصفية البلاغات</button>
+                <button class="btn btn-danger" style="padding: 5px 10px; font-size: 12px;" onclick="deleteQuestion('${q._id}')">حذف السؤال</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function clearQuestionReports(id) {
+      if (!confirm('هل أنت تأكد من تصفية بلاغات هذا السؤال والتأكيد على صحته؟')) return;
+      fetch('/api/admin/questions/' + id, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify({ resetReports: true })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message || 'تم تصفية البلاغات بنجاح!');
+        loadReportedQuestions();
+      });
+    }
+
+    /* 💬 USER FEEDBACKS & COMPLAINTS HANDLERS */
+    function loadFeedbacks() {
+      fetch('/api/admin/feedbacks', {
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(res => res.json())
+      .then(data => {
+        const list = Array.isArray(data) ? data : [];
+        renderFeedbacks(list);
+      })
+      .catch(console.error);
+    }
+
+    function renderFeedbacks(list) {
+      const tbody = document.getElementById('feedbacksTableBody');
+      if (!list || !list.length) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--ink-muted);">لا توجد شكاوى أو اقتراحات مسجلة حالياً</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(f => {
+        const dateStr = f.createdAt ? new Date(f.createdAt).toLocaleString('ar-EG') : '-';
+        const uName = f.username || (f.user && f.user.username) || 'لاعب حنكشة';
+        return `
+          <tr>
+            <td style="font-weight: 800; color: var(--primary-violet);">${uName}</td>
+            <td style="font-weight: 600; line-height: 1.6; max-width: 450px;">${f.content || f.message || '-'}</td>
+            <td style="font-size: 12px; color: var(--ink-muted);">${dateStr}</td>
+            <td>
+              <button class="btn btn-danger" style="padding: 5px 10px; font-size: 12px;" onclick="deleteFeedback('${f._id}')">حذف الشكوى</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function deleteFeedback(id) {
+      if (!confirm('هل أنت تأكد من حذف هذه الشكوى؟')) return;
+      fetch('/api/admin/feedbacks/' + id, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message || 'تم حذف الشكوى بنجاح!');
+        loadFeedbacks();
+      });
+    }
+
+    /* ❓ QUESTIONS LIBRARY HANDLERS */
+    let questionsCache = [];
+    function loadQuestions() {
+      const cat = document.getElementById('questionCategoryFilter').value;
+      const search = document.getElementById('questionSearchInput').value.trim();
+      let url = '/api/admin/questions?limit=50';
+      if (cat) url += '&category=' + encodeURIComponent(cat);
+      if (search) url += '&search=' + encodeURIComponent(search);
+
+      fetch(url, {
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(res => res.json())
+      .then(data => {
+        questionsCache = data.questions || [];
+        renderQuestions(questionsCache);
+      })
+      .catch(console.error);
+    }
+
+    function renderQuestions(list) {
+      const tbody = document.getElementById('questionsTableBody');
+      if (!list || !list.length) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--ink-muted);">لا توجد أسئلة مطابقة للفلتر أو البحث</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(q => {
+        const flagImgUrl = q.flagImage || (q.category === 'flags' && q.text && q.text.startsWith('http') ? q.text : '');
+        const imgHtml = flagImgUrl
+          ? `<img src="${flagImgUrl}" alt="علم" style="width: 44px; height: 30px; object-fit: contain; border-radius: 6px; border: 1.5px solid var(--border-line-bold); background: #ffffff; flex-shrink: 0; margin-left: 10px;" />`
+          : '';
+
+        return `
+          <tr>
+            <td style="font-weight: 700; max-width: 360px;">
+              <div style="display: flex; align-items: center;">
+                ${imgHtml}
+                <span>${q.text}</span>
+              </div>
+            </td>
+            <td><span class="badge-status badge-active" style="font-size: 11px;">${q.category}</span></td>
+            <td style="color: var(--accent-emerald); font-weight: 800;">${q.answer}</td>
+            <td style="font-size: 12px; color: var(--ink-muted);">${q.difficulty || 'medium'}</td>
+            <td>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;" onclick='openEditQuestion(${JSON.stringify(q).replace(/'/g, "&apos;")})'>تعديل</button>
+                <button class="btn btn-danger" style="padding: 5px 10px; font-size: 12px;" onclick="deleteQuestion('${q._id}')">حذف</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function handleSearchQuestions() {
+      loadQuestions();
+    }
+
+    function openAddQuestionModal() {
+      document.getElementById('editQuestionId').value = '';
+      document.getElementById('questionModalTitle').innerHTML = '<i data-lucide="help-circle" style="color: var(--primary-violet);"></i> إضافة سؤال جديد';
+      document.getElementById('qTextInput').value = '';
+      document.getElementById('qAnswerInput').value = '';
+      document.getElementById('qAcceptedAnswersInput').value = '';
+      document.getElementById('qFlagImageInput').value = '';
+      document.getElementById('qDifficultyInput').value = 'medium';
+      document.getElementById('questionModal').classList.add('active');
+    }
+
+    function openEditQuestion(q) {
+      document.getElementById('editQuestionId').value = q._id;
+      document.getElementById('questionModalTitle').innerHTML = '<i data-lucide="edit-3" style="color: var(--primary-violet);"></i> تعديل السؤال';
+      document.getElementById('qTextInput').value = q.text || '';
+      document.getElementById('qCategoryInput').value = q.category || 'general-knowledge';
+      document.getElementById('qAnswerInput').value = q.answer || '';
+      document.getElementById('qAcceptedAnswersInput').value = Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers.join(', ') : '';
+      document.getElementById('qFlagImageInput').value = q.flagImage || '';
+      document.getElementById('qDifficultyInput').value = q.difficulty || 'medium';
+      document.getElementById('questionModal').classList.add('active');
+    }
+
+    function closeQuestionModal() {
+      document.getElementById('questionModal').classList.remove('active');
+    }
+
+    function saveQuestionSubmit() {
+      const id = document.getElementById('editQuestionId').value;
+      const text = document.getElementById('qTextInput').value.trim();
+      const category = document.getElementById('qCategoryInput').value;
+      const answer = document.getElementById('qAnswerInput').value.trim();
+      const rawAccepted = document.getElementById('qAcceptedAnswersInput').value;
+      const acceptedAnswers = rawAccepted ? rawAccepted.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const difficulty = document.getElementById('qDifficultyInput').value;
+      const flagImage = document.getElementById('qFlagImageInput').value.trim();
+
+      if (!text || !answer) {
+        alert('يرجى ملء نص السؤال والإجابة الرئيسية.');
+        return;
+      }
+
+      const payload = { text, category, answer, acceptedAnswers, difficulty, flagImage };
+      const url = id ? '/api/admin/questions/' + id : '/api/admin/questions';
+      const method = id ? 'PUT' : 'POST';
+
+      fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authToken
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message || (id ? 'تم تحديث السؤال بنجاح!' : 'تم إضافة السؤال بنجاح!'));
+        closeQuestionModal();
+        loadQuestions();
+        if (id) loadReportedQuestions();
+      });
+    }
+
+    function deleteQuestion(id) {
+      if (!confirm('هل أنت تأكد من حذف هذا السؤال نهائياً؟')) return;
+      fetch('/api/admin/questions/' + id, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message || 'تم حذف السؤال بنجاح.');
+        loadQuestions();
+        loadReportedQuestions();
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+    }
+
+    function loadAppSettings() {
+      fetch('/api/admin/app-settings', { headers: { 'Authorization': 'Bearer ' + authToken } })
+        .then(async (res) => ({ ok: res.ok, data: await res.json() }))
+        .then(({ ok, data }) => {
+          if (!ok) throw new Error(data.error || 'تعذر تحميل الإعدادات.');
+          document.getElementById('latestVersionInput').value = data.latestVersion || '1.0.0';
+          document.getElementById('minVersionInput').value = data.minVersion || '1.0.0';
+          document.getElementById('storeUrlInput').value = data.storeUrl || '';
+          document.getElementById('maintenanceEnabledInput').checked = !!data.maintenanceEnabled;
+          document.getElementById('maintenanceMessageInput').value = data.maintenanceMessage || '';
+        }).catch((error) => alert(error.message));
+    }
+
+    function saveAppSettings(event) {
+      event.preventDefault();
+      const payload = {
+        latestVersion: document.getElementById('latestVersionInput').value.trim(),
+        minVersion: document.getElementById('minVersionInput').value.trim(),
+        storeUrl: document.getElementById('storeUrlInput').value.trim(),
+        maintenanceEnabled: document.getElementById('maintenanceEnabledInput').checked,
+        maintenanceMessage: document.getElementById('maintenanceMessageInput').value.trim(),
+      };
+      if (payload.maintenanceEnabled && !confirm('وضع الصيانة هيمنع كل اللاعبين من دخول التطبيق. تأكيد؟')) return;
+      fetch('/api/admin/app-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify(payload) })
+        .then(async (res) => ({ ok: res.ok, data: await res.json() }))
+        .then(({ ok, data }) => { if (!ok) throw new Error(data.error || 'تعذر الحفظ.'); alert(data.message); })
+        .catch((error) => alert(error.message));
+    }
+
+    function loadPurchases() {
+      const status = document.getElementById('purchaseStatusFilter')?.value || 'pending';
+      fetch('/api/admin/purchases?status=' + encodeURIComponent(status), { headers: { 'Authorization': 'Bearer ' + authToken } })
+        .then(async (res) => ({ ok: res.ok, data: await res.json() }))
+        .then(({ ok, data }) => {
+          if (!ok) throw new Error(data.error || 'تعذر تحميل التحويلات.');
+          const tbody = document.getElementById('purchasesTableBody');
+          if (!data.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--ink-muted);">لا توجد طلبات في هذه الحالة.</td></tr>'; return; }
+          tbody.innerHTML = data.map((purchase) => {
+            const pending = purchase.status === 'pending';
+            return `<tr>
+              <td><strong>${escapeHtml(purchase.userId?.username || 'حساب محذوف')}</strong><br><small>${escapeHtml(purchase.userId?.email || '')}</small></td>
+              <td>${escapeHtml(purchase.paymentMethod)}</td><td>${escapeHtml(purchase.referenceNumber || '—')}</td>
+              <td>${Number(purchase.amountEgp || 0).toLocaleString('ar-EG')} ج.م</td><td>${Number(purchase.gemsGranted || 0).toLocaleString('ar-EG')}</td>
+              <td>${new Date(purchase.createdAt).toLocaleString('ar-EG')}</td>
+              <td>${pending ? `<div style="display:flex;gap:6px;"><button class="btn btn-success" onclick="reviewPurchase('${purchase._id}','approve')">اعتماد</button><button class="btn btn-danger" onclick="reviewPurchase('${purchase._id}','reject')">رفض</button></div>` : `<span class="badge-status ${purchase.status === 'completed' ? 'badge-active' : 'badge-banned'}">${purchase.status === 'completed' ? 'معتمد' : 'مرفوض'}</span>`}</td>
+            </tr>`;
+          }).join('');
+        })
+        .catch((error) => { document.getElementById('purchasesTableBody').innerHTML = `<tr><td colspan="7">${escapeHtml(error.message)}</td></tr>`; });
+    }
+
+    function reviewPurchase(id, decision) {
+      const verb = decision === 'approve' ? 'اعتماد التحويل وإضافة الجواهر' : 'رفض التحويل';
+      if (!confirm('تأكيد ' + verb + '؟')) return;
+      const rejectionReason = decision === 'reject' ? (prompt('سبب الرفض (اختياري):') || '') : '';
+      fetch('/api/admin/purchases/' + id + '/review', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+        body: JSON.stringify({ decision, rejectionReason })
+      }).then(async (res) => ({ ok: res.ok, data: await res.json() }))
+        .then(({ ok, data }) => { if (!ok) throw new Error(data.error || 'تعذر تنفيذ المراجعة.'); alert(data.message); loadPurchases(); loadUsersList(); })
+        .catch((error) => alert(error.message));
+    }
+  </script>
+</body>
+</html>

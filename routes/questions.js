@@ -8,13 +8,15 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const { category, difficulty, limit = 10 } = req.query;
+    const parsedLimit = Number.parseInt(limit, 10);
+    const safeLimit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 50) : 10;
     const filter = {};
     if (category) filter.category = category;
     if (difficulty) filter.difficulty = difficulty;
 
     const questions = await Question.aggregate([
       { $match: filter },
-      { $sample: { size: Number(limit) } },
+      { $sample: { size: safeLimit } },
     ]);
 
     res.json(questions);
