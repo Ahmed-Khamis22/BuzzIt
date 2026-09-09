@@ -41,7 +41,7 @@ router.post('/', auth, admin, async (req, res) => {
 
 router.post('/:id/report', auth, async (req, res) => {
   try {
-    const question = await Question.findById(req.params.id).lean();
+    const question = await Question.findById(req.params.id);
     if (!question) return res.status(404).json({ error: 'السؤال غير موجود.' });
 
     if (question.reportedBy.some((id) => String(id) === String(req.userId))) {

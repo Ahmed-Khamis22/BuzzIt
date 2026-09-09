@@ -3,9 +3,11 @@ const express = require('express');
 const { rateLimit } = require('express-rate-limit');
 
 const Question = require('../models/Question');
+const User = require('../models/User');
 const auth = require('../middleware/auth');
 const { aiJudge } = require('../services/aiJudge');
 const { getPersistentJudgment, savePersistentJudgment } = require('../services/soloJudgmentCache');
+const { awardSoloProgress, calculateLevel } = require('../services/gameService');
 const {
   buildDifficultyCurve,
   evaluateContextualAnswer,
@@ -13,6 +15,17 @@ const {
   normalizeArabic,
   uniqueAlternatives,
 } = require('../services/soloGameLogic');
+const {
+  SESSION_TTL_MS,
+  answerKnownQuestion,
+  categoryForSecret,
+  createInitialAiMove,
+  createSession,
+  finishSession,
+  nextFallbackMove,
+  publicSession,
+  resolveInterpretedAnswer,
+} = require('../services/tenByTenLogic');
 
 const router = express.Router();
 const AI_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -21,10 +34,15 @@ const CHALLENGE_TTL_MS = 90 * 60 * 1000;
 const judgmentCache = new Map();
 const activeChallenges = new Map();
 const lastForbiddenByUserAndQuestion = new Map();
+const tenByTenSessions = new Map();
+const recentTenByTenSecretsByUser = new Map();
+const RECENT_SECRET_HISTORY_MAX = 199;
+const RECENT_SECRET_HISTORY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const judgeLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 30,
+  limit: 60,
+  keyGenerator: (req) => String(req.userId),
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'TOO_MANY_JUDGMENTS', retryable: true },
@@ -54,6 +72,25 @@ function clearUserChallenges(userId) {
   }
 }
 
+function pruneTenByTenSessions() {
+  const now = Date.now();
+  for (const [sessionId, session] of tenByTenSessions.entries()) {
+    if (session.expiresAt <= now) tenByTenSessions.delete(sessionId);
+  }
+  for (const [userId, history] of recentTenByTenSecretsByUser.entries()) {
+    if (history.updatedAt + RECENT_SECRET_HISTORY_TTL_MS <= now) recentTenByTenSecretsByUser.delete(userId);
+  }
+}
+
+function getTenByTenSession(req) {
+  pruneTenByTenSessions();
+  const sessionId = String(req.body?.sessionId || '');
+  const session = tenByTenSessions.get(sessionId);
+  if (!session || session.userId !== String(req.userId)) return null;
+  session.expiresAt = Date.now() + SESSION_TTL_MS;
+  return session;
+}
+
 function chooseForbidden(question, userId) {
   const choices = answerPool(question);
   if (choices.length === 0) return { normalized: normalizeArabic(question.answer), raw: question.answer };
@@ -69,13 +106,12 @@ function chooseForbidden(question, userId) {
   return selected;
 }
 
-function createChallenge(question, userId, index, total) {
+function createChallenge(question, userId, streakIndex = 0) {
   const forbidden = chooseForbidden(question, userId);
   const alternatives = answerPool(question)
     .filter((choice) => choice.normalized !== forbidden.normalized)
     .map((choice) => choice.raw);
   const challengeId = crypto.randomBytes(18).toString('hex');
-  const progress = total <= 1 ? 1 : index / (total - 1);
   activeChallenges.set(challengeId, {
     userId: String(userId),
     questionId: String(question._id),
@@ -88,7 +124,7 @@ function createChallenge(question, userId, index, total) {
   return {
     challengeId,
     text: question.text,
-    difficulty: progress < 0.34 ? 'easy' : progress < 0.74 ? 'medium' : 'hard',
+    difficulty: streakIndex < 20 ? 'easy' : streakIndex < 75 ? 'medium' : 'hard',
   };
 }
 
@@ -110,6 +146,54 @@ function cacheJudgment(key, value) {
   judgmentCache.set(key, { value, expiresAt: Date.now() + AI_CACHE_TTL_MS });
 }
 
+async function recordDontSayProgress(userId, challenge) {
+  if (challenge.progressClaimed && challenge.progressSnapshot) {
+    return challenge.progressSnapshot;
+  }
+
+  challenge.progressClaimed = true;
+  try {
+    const user = await User.findById(userId);
+    if (!user) throw new Error('USER_NOT_FOUND');
+    const stats = user.soloStats?.dontSayMyWord || {};
+    const currentStreak = (stats.currentStreak || 0) + 1;
+    const bestStreak = Math.max(stats.bestStreak || 0, currentStreak);
+    const earnedPoints = 10 + Math.min(40, Math.floor(currentStreak / 10) * 2);
+    const totalPoints = (stats.points || 0) + earnedPoints;
+
+    user.set('soloStats.dontSayMyWord.currentStreak', currentStreak);
+    user.set('soloStats.dontSayMyWord.bestStreak', bestStreak);
+    user.set('soloStats.dontSayMyWord.points', totalPoints);
+    user.xp = (user.xp || 0) + 2;
+    user.level = calculateLevel(user.xp);
+    await user.save();
+
+    challenge.progressSnapshot = {
+      currentStreak,
+      bestStreak,
+      points: totalPoints,
+      earnedPoints,
+      xpEarned: 2,
+      xp: user.xp,
+      level: user.level,
+    };
+    return challenge.progressSnapshot;
+  } catch (error) {
+    challenge.progressClaimed = false;
+    throw error;
+  }
+}
+
+async function sendDontSayJudgment(res, challenge, payload) {
+  challenge.judged = true;
+  challenge.valid = Boolean(payload.valid);
+  challenge.outcome = payload.outcome;
+  if (payload.valid) {
+    payload.streakStats = await recordDontSayProgress(challenge.userId, challenge);
+  }
+  return res.json(payload);
+}
+
 async function loadQuestionPool() {
   return Question.find({ category: 'dont-say-my-word' })
     .select('_id text answer acceptedAnswers judgeMode')
@@ -119,12 +203,67 @@ async function loadQuestionPool() {
 router.get('/dont-say-my-word', auth, async (req, res) => {
   try {
     pruneExpiredChallenges();
-    clearUserChallenges(req.userId);
+    const requestedStreak = Math.max(0, Number(req.query?.streak) || 0);
+    const newRun = String(req.query?.newRun || '') === '1';
+    if (newRun) clearUserChallenges(req.userId);
     const pool = await loadQuestionPool();
-    const questions = buildDifficultyCurve(pool, 10);
-    res.json(questions.map((question, index) => createChallenge(question, req.userId, index, questions.length)));
+    if (!pool.length) return res.status(404).json({ error: 'NO_SOLO_QUESTIONS' });
+    const orderedPool = buildDifficultyCurve(pool, pool.length);
+    const batchSize = Math.min(40, Math.max(10, Number(req.query?.limit) || 25));
+    const questions = Array.from({ length: batchSize }, (_, offset) => orderedPool[(requestedStreak + offset) % orderedPool.length]);
+    const user = await User.findById(req.userId).select('soloStats.dontSayMyWord').lean();
+    const stored = user?.soloStats?.dontSayMyWord || {};
+    if (newRun) {
+      await User.updateOne({ _id: req.userId }, { $set: { 'soloStats.dontSayMyWord.currentStreak': 0 } });
+    }
+    res.json({
+      questions: questions.map((question, index) => createChallenge(question, req.userId, requestedStreak + index)),
+      stats: {
+        currentStreak: newRun ? 0 : (stored.currentStreak || 0),
+        bestStreak: stored.bestStreak || 0,
+        points: stored.points || 0,
+      },
+      totalQuestionBank: pool.length,
+    });
   } catch (error) {
     res.status(500).json({ error: 'SOLO_GAME_LOAD_FAILED' });
+  }
+});
+
+router.get('/dont-say-my-word/leaderboard', auth, async (req, res) => {
+  try {
+    const players = await User.find({ 'soloStats.dontSayMyWord.bestStreak': { $gt: 0 } })
+      .select('username soloStats.dontSayMyWord.bestStreak equippedItems.avatar equippedItems.border')
+      .sort({ 'soloStats.dontSayMyWord.bestStreak': -1, _id: 1 })
+      .limit(50)
+      .populate({ path: 'equippedItems.avatar', select: 'name imageUrl price type' })
+      .populate({ path: 'equippedItems.border', select: 'name imageUrl price type' })
+      .lean();
+
+    return res.json(players.map((player, index) => ({
+      rank: index + 1,
+      userId: player._id,
+      username: player.username,
+      bestStreak: player.soloStats?.dontSayMyWord?.bestStreak || 0,
+      equippedItems: player.equippedItems || {},
+    })));
+  } catch (error) {
+    return res.status(500).json({ error: 'STREAK_LEADERBOARD_FAILED' });
+  }
+});
+
+router.post('/dont-say-my-word/progress', auth, async (req, res) => {
+  pruneExpiredChallenges();
+  const challengeId = String(req.body?.challengeId || '');
+  const challenge = activeChallenges.get(challengeId);
+  if (!challenge || challenge.userId !== String(req.userId) || !challenge.judged || !challenge.valid) {
+    return res.status(400).json({ error: 'INVALID_STREAK_PROGRESS' });
+  }
+  if (challenge.progressClaimed) return res.status(409).json({ error: 'STREAK_PROGRESS_ALREADY_CLAIMED' });
+  try {
+    return res.json(await recordDontSayProgress(req.userId, challenge));
+  } catch (error) {
+    return res.status(500).json({ error: 'STREAK_PROGRESS_FAILED' });
   }
 });
 
@@ -140,14 +279,13 @@ router.post('/dont-say-my-word/replacement', auth, async (req, res) => {
         .filter((challenge) => challenge?.userId === String(req.userId))
         .map((challenge) => challenge.questionId),
     );
-    const round = Math.max(1, Math.min(10, Number(req.body?.round) || 1));
+    const round = Math.max(1, Number(req.body?.round) || 1);
     const pool = (await loadQuestionPool()).filter((question) => !excludedQuestionIds.has(String(question._id)));
     const fallbackPool = pool.length ? pool : await loadQuestionPool();
-    const curve = buildDifficultyCurve(fallbackPool, Math.min(10, fallbackPool.length));
-    const targetIndex = Math.min(curve.length - 1, Math.round(((round - 1) / 9) * (curve.length - 1)));
-    const question = curve[targetIndex];
+    const curve = buildDifficultyCurve(fallbackPool, fallbackPool.length);
+    const question = curve[(round - 1) % curve.length];
     if (!question) return res.status(404).json({ error: 'NO_REPLACEMENT_QUESTION' });
-    return res.json(createChallenge(question, req.userId, round - 1, 10));
+    return res.json(createChallenge(question, req.userId, round - 1));
   } catch (error) {
     return res.status(500).json({ error: 'SOLO_REPLACEMENT_FAILED' });
   }
@@ -171,7 +309,7 @@ router.post('/dont-say-my-word/judge', auth, judgeLimiter, async (req, res) => {
     const localDecisionIsSafe = question.judgeMode !== 'open'
       || local.method === 'normalized_exact';
     if (localDecisionIsSafe && local.outcome === 'forbidden') {
-      return res.json({
+      return sendDontSayJudgment(res, question, {
         valid: false,
         outcome: 'forbidden',
         forbiddenWord: question.answer,
@@ -180,7 +318,7 @@ router.post('/dont-say-my-word/judge', auth, judgeLimiter, async (req, res) => {
       });
     }
     if (localDecisionIsSafe && local.outcome === 'valid') {
-      return res.json({
+      return sendDontSayJudgment(res, question, {
         valid: true,
         outcome: 'valid',
         forbiddenWord: question.answer,
@@ -221,7 +359,7 @@ router.post('/dont-say-my-word/judge', auth, judgeLimiter, async (req, res) => {
       }
 
       if (judgment.matchesForbidden) {
-        return res.json({
+        return sendDontSayJudgment(res, question, {
           valid: false,
           outcome: 'forbidden',
           forbiddenWord: question.answer,
@@ -231,7 +369,7 @@ router.post('/dont-say-my-word/judge', auth, judgeLimiter, async (req, res) => {
         });
       }
       if (!judgment.relevant) {
-        return res.json({
+        return sendDontSayJudgment(res, question, {
           valid: false,
           outcome: 'invalid',
           forbiddenWord: question.answer,
@@ -240,7 +378,7 @@ router.post('/dont-say-my-word/judge', auth, judgeLimiter, async (req, res) => {
           confidence: judgment.confidence,
         });
       }
-      return res.json({
+      return sendDontSayJudgment(res, question, {
         valid: true,
         outcome: 'valid',
         forbiddenWord: question.answer,
@@ -250,7 +388,7 @@ router.post('/dont-say-my-word/judge', auth, judgeLimiter, async (req, res) => {
     } catch (aiError) {
       const fallback = evaluateKnownAnswer(question, answer);
       if (fallback.outcome === 'forbidden') {
-        return res.json({
+        return sendDontSayJudgment(res, question, {
           valid: false,
           outcome: 'forbidden',
           forbiddenWord: question.answer,
@@ -259,7 +397,7 @@ router.post('/dont-say-my-word/judge', auth, judgeLimiter, async (req, res) => {
         });
       }
       if (fallback.outcome === 'valid') {
-        return res.json({
+        return sendDontSayJudgment(res, question, {
           valid: true,
           outcome: 'valid',
           forbiddenWord: question.answer,
@@ -267,7 +405,7 @@ router.post('/dont-say-my-word/judge', auth, judgeLimiter, async (req, res) => {
           fallback: true,
         });
       }
-      return res.json({
+      return sendDontSayJudgment(res, question, {
         valid: true,
         outcome: 'valid',
         reason: 'تم قبول الإجابة احتياطيًا لأن خدمات التحكيم الذكي غير متاحة مؤقتًا.',
@@ -278,6 +416,223 @@ router.post('/dont-say-my-word/judge', auth, judgeLimiter, async (req, res) => {
   } catch (error) {
     return res.status(500).json({ error: 'SOLO_JUDGMENT_FAILED', retryable: true });
   }
+});
+
+router.post('/dont-say-my-word/complete', auth, async (req, res) => {
+  pruneExpiredChallenges();
+  const challengeIds = [...new Set(
+    (Array.isArray(req.body?.challengeIds) ? req.body.challengeIds : []).map(String)
+  )];
+  if (challengeIds.length !== 10) {
+    return res.status(400).json({ error: 'SOLO_GAME_NOT_COMPLETE' });
+  }
+
+  const challenges = challengeIds.map((id) => activeChallenges.get(id));
+  const validRun = challenges.every(
+    (challenge) => challenge
+      && challenge.userId === String(req.userId)
+      && challenge.judged
+      && challenge.valid
+      && !challenge.xpClaimed
+  );
+  if (!validRun) return res.status(400).json({ error: 'SOLO_GAME_NOT_COMPLETE' });
+
+  // Claim in memory before awaiting the database update, so repeated taps or
+  // retried requests cannot award the same run twice.
+  challenges.forEach((challenge) => { challenge.xpClaimed = true; });
+  try {
+    const progress = await awardSoloProgress(req.userId, {
+      xp: 50,
+      won: true,
+      correct: 10,
+    });
+    if (!progress) return res.status(404).json({ error: 'USER_NOT_FOUND' });
+    return res.json(progress);
+  } catch (error) {
+    challenges.forEach((challenge) => { challenge.xpClaimed = false; });
+    return res.status(500).json({ error: 'SOLO_PROGRESS_FAILED' });
+  }
+});
+
+router.post('/ten-by-ten/start', auth, judgeLimiter, (req, res) => {
+  pruneTenByTenSessions();
+  for (const [sessionId, session] of tenByTenSessions.entries()) {
+    if (session.userId === String(req.userId)) tenByTenSessions.delete(sessionId);
+  }
+  const userKey = String(req.userId);
+  const recentHistory = recentTenByTenSecretsByUser.get(userKey)?.secrets || [];
+  const session = createSession({
+    userId: req.userId,
+    category: String(req.body?.category || 'mixed'),
+    difficulty: String(req.body?.difficulty || 'medium'),
+    excludedSecrets: recentHistory,
+  });
+  recentTenByTenSecretsByUser.set(userKey, {
+    secrets: [...recentHistory.filter((word) => word !== session.aiSecret), session.aiSecret].slice(-RECENT_SECRET_HISTORY_MAX),
+    updatedAt: Date.now(),
+  });
+  tenByTenSessions.set(session.id, session);
+  return res.json(publicSession(session));
+});
+
+router.post('/ten-by-ten/abandon', auth, (req, res) => {
+  const session = getTenByTenSession(req);
+  if (!session) return res.status(204).end();
+  session.status = 'finished';
+  session.phase = 'result';
+  session.winner = 'ai';
+  tenByTenSessions.delete(session.id);
+  return res.status(204).end();
+});
+
+router.post('/ten-by-ten/surrender', auth, (req, res) => {
+  const session = getTenByTenSession(req);
+  if (!session) return res.status(404).json({ error: 'TEN_BY_TEN_SESSION_NOT_FOUND' });
+  if (session.status !== 'playing') return res.json(publicSession(session));
+
+  session.status = 'finished';
+  session.phase = 'result';
+  session.winner = 'ai';
+  session.surrendered = true;
+
+  return res.json(publicSession(session, { surrendered: true }));
+});
+
+router.post('/ten-by-ten/turn', auth, judgeLimiter, async (req, res) => {
+  const session = getTenByTenSession(req);
+  if (!session) return res.status(404).json({ error: 'TEN_BY_TEN_SESSION_NOT_FOUND' });
+  if (session.status !== 'playing') return res.json(publicSession(session));
+  if (session.turnInFlight) return res.status(409).json({ error: 'TEN_BY_TEN_TURN_IN_PROGRESS', retryable: true });
+  session.turnInFlight = true;
+  const releaseTurn = () => { session.turnInFlight = false; };
+  setTimeout(releaseTurn, 70000);
+
+  let playerAnswer = null;
+  let playerAnswerText = null;
+  let degraded = false;
+  let provider = null;
+  let isCorrectGuess = false;
+  let soloProgress = null;
+
+  if (session.phase === 'player') {
+    const rawAction = req.body?.playerAction;
+    if (!rawAction) { releaseTurn(); return res.status(400).json({ error: 'TEN_BY_TEN_PLAYER_ACTION_REQUIRED' }); }
+    const type = 'question';
+    const text = String(rawAction.text || '').trim().slice(0, 160);
+    if (!text) { releaseTurn(); return res.status(400).json({ error: 'TEN_BY_TEN_PLAYER_ACTION_REQUIRED' }); }
+    session.playerActions += 1;
+    
+    try {
+      const localAnswer = answerKnownQuestion({ secretWord: session.aiSecret, question: text });
+      const aiAnswer = localAnswer ? null : await aiJudge.answerTenByTenQuestion({
+          secretWord: session.aiSecret,
+          secretCategory: categoryForSecret(session.aiSecret) || session.category,
+          question: text,
+          history: session.playerHistory,
+        });
+      const answer = localAnswer || {
+        ...resolveInterpretedAnswer({ secretWord: session.aiSecret, judgment: aiAnswer }),
+        provider: aiAnswer.provider,
+      };
+      playerAnswer = answer.answer;
+      if (aiAnswer?.reply) {
+        const normalizedReply = normalizeArabic(aiAnswer.reply);
+        const normalizedSecret = normalizeArabic(session.aiSecret);
+        if (!normalizedReply.includes(normalizedSecret)) playerAnswerText = aiAnswer.reply;
+      }
+      provider = answer.provider || answer.source;
+      if (answer.correctGuess) {
+        session.playerSolvedAt = session.playerActions;
+        isCorrectGuess = true;
+      }
+    } catch (error) {
+      degraded = true;
+      playerAnswer = 'unknown';
+    }
+    session.playerHistory.push({ type, text, answer: playerAnswer });
+
+    if (session.playerSolvedAt) {
+      session.phase = 'ai';
+      try {
+        const generated = await aiJudge.generateTenByTenMove({
+          category: session.category,
+          difficulty: session.difficulty,
+          aiHistory: session.aiHistory,
+          attempt: session.aiActions + 1,
+          strategy: session.aiQuestionStrategy,
+        });
+        session.pendingAiMove = generated.move;
+        provider = generated.provider;
+      } catch (error) {
+        degraded = true;
+        session.pendingAiMove = nextFallbackMove(session);
+      }
+      session.aiActions += 1;
+    }
+  } else if (session.phase === 'ai') {
+    const pending = session.pendingAiMove;
+    const aiResponse = String(req.body?.aiResponse || '');
+    const allowed = ['yes', 'no', 'unknown'];
+    if (!pending || !allowed.includes(aiResponse)) {
+      releaseTurn();
+      return res.status(400).json({ error: 'TEN_BY_TEN_AI_RESPONSE_REQUIRED', expected: pending?.type || 'question' });
+    }
+    session.aiHistory.push({ ...pending, answer: aiResponse });
+    session.pendingAiMove = null;
+    if (pending.isGuess && aiResponse === 'yes') session.aiSolvedAt = session.aiActions;
+
+    if (session.aiSolvedAt) {
+      finishSession(session);
+    } else {
+      try {
+        const generated = await aiJudge.generateTenByTenMove({
+          category: session.category,
+          difficulty: session.difficulty,
+          aiHistory: session.aiHistory,
+          attempt: session.aiActions + 1,
+          strategy: session.aiQuestionStrategy,
+        });
+        session.pendingAiMove = generated.move;
+        provider = generated.provider;
+      } catch (error) {
+        degraded = true;
+        session.pendingAiMove = nextFallbackMove(session);
+      }
+      session.aiActions += 1;
+    }
+  }
+
+  if (session.status === 'finished' && !session.xpAwarded) {
+    session.xpAwarded = true;
+    const won = session.winner === 'player';
+    const tied = session.winner === 'tie';
+    const efficiencyBonus = won ? Math.max(0, 10 - (session.playerSolvedAt || 10)) * 2 : 0;
+    try {
+      soloProgress = await awardSoloProgress(req.userId, {
+        xp: won ? 45 + efficiencyBonus : (tied ? 20 : 15),
+        won,
+        correct: won ? 1 : 0,
+        wrong: won ? 0 : 1,
+      });
+    } catch (error) {
+      session.xpAwarded = false;
+      console.error('Failed to save ten-by-ten XP:', error.message);
+    }
+  }
+
+  releaseTurn();
+  return res.json(publicSession(session, {
+    playerAnswer,
+    playerAnswerText,
+    playerCorrectGuess: isCorrectGuess,
+    degraded,
+    provider,
+    ...(soloProgress ? {
+      xpEarned: soloProgress.xpEarned,
+      xp: soloProgress.xp,
+      level: soloProgress.level,
+    } : {}),
+  }));
 });
 
 module.exports = router;
