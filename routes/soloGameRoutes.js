@@ -39,6 +39,18 @@ const recentTenByTenSecretsByUser = new Map();
 const RECENT_SECRET_HISTORY_MAX = 199;
 const RECENT_SECRET_HISTORY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+// The database bank is the primary source. This embedded bank keeps the solo
+// game playable while a fresh deployment is still syncing Mongo questions.
+const FALLBACK_SOLO_QUESTIONS = [
+  { _id: 'solo-fallback-colors', text: 'اذكر اسم لون', answer: 'أحمر', acceptedAnswers: ['أزرق', 'أخضر', 'أصفر', 'أسود', 'أبيض', 'برتقالي', 'بنفسجي', 'وردي', 'بني', 'رمادي'] },
+  { _id: 'solo-fallback-fruit', text: 'اذكر اسم فاكهة', answer: 'تفاح', acceptedAnswers: ['موز', 'برتقال', 'عنب', 'مانجو', 'فراولة', 'بطيخ', 'خوخ', 'رمان', 'تين', 'كمثرى', 'جوافة'] },
+  { _id: 'solo-fallback-countries', text: 'اذكر دولة عربية', answer: 'مصر', acceptedAnswers: ['السعودية', 'الإمارات', 'المغرب', 'تونس', 'الجزائر', 'سوريا', 'فلسطين', 'العراق', 'لبنان', 'الأردن', 'الكويت', 'قطر'] },
+  { _id: 'solo-fallback-jobs', text: 'اذكر مهنة أو وظيفة', answer: 'طبيب', acceptedAnswers: ['مهندس', 'مدرس', 'محامي', 'محاسب', 'طيار', 'نجار', 'سباك', 'شرطي', 'صحفي', 'ممرض'] },
+  { _id: 'solo-fallback-transport', text: 'اذكر وسيلة مواصلات', answer: 'سيارة', acceptedAnswers: ['طائرة', 'قطار', 'مترو', 'أتوبيس', 'سفينة', 'دراجة', 'موتوسيكل', 'تاكسي', 'ترام'] },
+  { _id: 'solo-fallback-animals', text: 'اذكر حيوانًا مفترسًا', answer: 'أسد', acceptedAnswers: ['نمر', 'فهد', 'ذئب', 'دب', 'تمساح', 'ضبع', 'قرش', 'ثعلب'] },
+  { _id: 'solo-fallback-sports', text: 'اذكر رياضة تُلعب بالكرة', answer: 'كرة القدم', acceptedAnswers: ['كرة السلة', 'كرة الطائرة', 'كرة اليد', 'التنس', 'تنس الطاولة'] },
+];
+
 const judgeLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 60,
@@ -195,9 +207,10 @@ async function sendDontSayJudgment(res, challenge, payload) {
 }
 
 async function loadQuestionPool() {
-  return Question.find({ category: 'dont-say-my-word' })
+  const questions = await Question.find({ category: 'dont-say-my-word' })
     .select('_id text answer acceptedAnswers judgeMode')
     .lean();
+  return questions.length ? questions : FALLBACK_SOLO_QUESTIONS;
 }
 
 router.get('/dont-say-my-word', auth, async (req, res) => {

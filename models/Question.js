@@ -25,9 +25,13 @@ const questionSchema = new mongoose.Schema({
   // "الإبلاغ عن السؤال" — one report per user so a single player can't spam it.
   reportCount: { type: Number, default: 0 },
   reportedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  // Stable identity for curated game-bank records; absent on admin-authored questions.
+  bankKey: { type: String, default: null },
+  bankVersion: { type: Number, default: null },
 });
 
 // Supports the filters used when selecting the next round question.
 questionSchema.index({ isCustomTrivia: 1, category: 1, difficulty: 1, judgeEvaluated: 1, _id: 1 });
+questionSchema.index({ category: 1, bankKey: 1 });
 
 module.exports = mongoose.model('Question', questionSchema);

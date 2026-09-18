@@ -17,6 +17,23 @@ function normalizeForSpelling(value = '') {
     : normalized;
 }
 
+// A few very common Egyptian/Modern Standard Arabic forms are different words
+// after ordinary letter normalization, although players mean exactly the same
+// thing. Keep this deliberately small: it is only for certain equivalences,
+// never broad "related word" matching.
+function normalizeSemanticAnswer(value = '') {
+  const normalized = normalizeForSpelling(value);
+  const aliases = {
+    ايد: 'يد',
+    يد: 'يد',
+    عربيه: 'سيارة',
+    سياره: 'سيارة',
+    موتوسيكل: 'دراجه ناريه',
+    موتوسيكلات: 'دراجه ناريه',
+  };
+  return aliases[normalized] || normalized;
+}
+
 function damerauLevenshtein(firstValue, secondValue) {
   const first = String(firstValue || '');
   const second = String(secondValue || '');
@@ -143,6 +160,22 @@ function evaluateContextualAnswer(question, rawAnswer) {
     };
   }
 
+  const semanticAnswer = normalizeSemanticAnswer(answer);
+  const semanticForbidden = normalizeSemanticAnswer(question?.answer);
+  if (semanticAnswer && semanticAnswer === semanticForbidden) {
+    return {
+      outcome: 'forbidden', method: 'known_semantic_alias', confidence: 1, matchedAnswer: question.answer,
+    };
+  }
+  const semanticValid = (question?.acceptedAnswers || []).find((candidate) => (
+    semanticAnswer && semanticAnswer === normalizeSemanticAnswer(candidate)
+  ));
+  if (semanticValid) {
+    return {
+      outcome: 'valid', method: 'known_semantic_alias', confidence: 1, matchedAnswer: semanticValid,
+    };
+  }
+
   const typoLimit = allowedTypoDistance(normalizedAnswer);
   if (typoLimit === 0) return { outcome: 'unknown', method: 'no_safe_match', confidence: 0 };
 
@@ -165,6 +198,7 @@ function evaluateContextualAnswer(question, rawAnswer) {
 module.exports = {
   normalizeArabic,
   normalizeForSpelling,
+  normalizeSemanticAnswer,
   damerauLevenshtein,
   uniqueAlternatives,
   answerCount,

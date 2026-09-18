@@ -1212,6 +1212,10 @@ async function fetchOneQuestion(room) {
   }
 
   if (count === 0) {
+    if (room.config?.gameMode === 'predict') {
+      return createPredictFallbackQuestion();
+    }
+
     // If specific filters produced 0, try general trivia pool
     const fallbackStage = { isTriviaChoice: true };
     count = await Question.countDocuments(fallbackStage);
@@ -1282,6 +1286,29 @@ const FALLBACK_TRIVIA_QUESTIONS = [
   { text: 'ما هو أسرع حيوان بري في العالم؟', choices: ['الفهد', 'الأسد', 'الغزال', 'النمر'], answer: 'الفهد' },
   { text: 'في أي قارة تقع مصر؟', choices: ['أفريقيا', 'آسيا', 'أوروبا', 'أمريكا الجنوبية'], answer: 'أفريقيا' },
 ];
+
+// Predict has a distinct question format. Do not fall back to trivia when its
+// Mongo collection is empty: the host needs an open-ended prompt, not choices.
+const FALLBACK_PREDICT_QUESTIONS = [
+  'اذكر حاجة أغلب الناس بتعملها أول ما تصحى من النوم.',
+  'اذكر أكلة مصرية مشهورة.',
+  'اذكر حاجة بتلاقيها غالبًا في الشنطة.',
+  'اذكر مادة دراسية الطلاب بيشتكوا منها كتير.',
+  'اذكر مكان الناس بتحب تروحه في الإجازة.',
+  'اذكر حاجة ممكن تنساها قبل ما تخرج من البيت.',
+  'اذكر حاجة بنستخدمها كل يوم في الموبايل.',
+  'اذكر مشروب الناس بتحبه في الصيف.',
+];
+
+function createPredictFallbackQuestion() {
+  const text = FALLBACK_PREDICT_QUESTIONS[Math.floor(Math.random() * FALLBACK_PREDICT_QUESTIONS.length)];
+  return {
+    _id: `predict-fallback-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    text,
+    category: 'predict-questions',
+    answer: 'إجابة مفتوحة',
+  };
+}
 
 function createTriviaDesignQuestion() {
   const item = FALLBACK_TRIVIA_QUESTIONS[Math.floor(Math.random() * FALLBACK_TRIVIA_QUESTIONS.length)];

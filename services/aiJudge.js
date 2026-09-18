@@ -128,13 +128,6 @@ function isStructuredOutputError(error) {
     || String(error?.message || '').startsWith('AI_TEN_BY_TEN_');
 }
 
-function isRetryableProviderError(error) {
-  if (isStructuredOutputError(error)) return true;
-  const status = Number(error?.response?.status || 0);
-  if ([408, 409, 425].includes(status) || status >= 500) return true;
-  return ['ECONNABORTED', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ENOTFOUND'].includes(error?.code);
-}
-
 function describeProviderError(provider, error, attempt) {
   return {
     provider: provider.id,
@@ -391,7 +384,9 @@ class AiJudge {
   }
 
   requestTimeout() {
-    return Math.max(3000, Number(this.env.AI_REQUEST_TIMEOUT_MS) || 12000);
+    // Solo rounds must feel instant. A provider that has not answered by this
+    // point is less useful than the deterministic local/fail-open fallback.
+    return Math.max(3000, Number(this.env.AI_REQUEST_TIMEOUT_MS) || 6500);
   }
 
   availableProviders() {
@@ -458,8 +453,10 @@ class AiJudge {
   }
 
   async runWithProviderFallback(operation, unavailableCode) {
-    const providers = this.availableProviders();
-    const retryProviders = [];
+    // Trying every configured provider and then retrying them can leave a
+    // player waiting close to a minute during an outage. Two independent
+    // providers give resilience while keeping an interactive turn bounded.
+    const providers = this.availableProviders().slice(0, 2);
     const causes = [];
 
     for (const provider of providers) {
@@ -470,19 +467,6 @@ class AiJudge {
         return { value, provider: provider.id };
       } catch (error) {
         causes.push(this.rememberProviderError(provider, error, 1, Date.now() - startedAt));
-        this.recordProviderFailure(provider, error);
-        if (isRetryableProviderError(error)) retryProviders.push(provider);
-      }
-    }
-
-    for (const provider of retryProviders) {
-      const startedAt = Date.now();
-      try {
-        const value = await operation(provider);
-        this.markSuccess(provider, Date.now() - startedAt);
-        return { value, provider: provider.id };
-      } catch (error) {
-        causes.push(this.rememberProviderError(provider, error, 2, Date.now() - startedAt));
         this.recordProviderFailure(provider, error);
       }
     }
