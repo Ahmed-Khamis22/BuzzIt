@@ -4,6 +4,8 @@ const GameHistory = require('../models/GameHistory');
 const auth = require('../middleware/auth');
 const { TASKS: DAILY_TASKS, resetDailyTasksIfStale, getDailyTasksState } = require('../services/dailyTasks');
 const { consumeAdView } = require('../services/adRewards');
+const SeasonScore = require('../models/SeasonScore');
+const { getActiveSeason, serializeSeason } = require('../services/seasonService');
 
 const router = express.Router();
 
@@ -43,6 +45,27 @@ function addPresence(req, rawUser) {
   };
 }
 
+async function seasonLeaderboardEntries(req, { seasonId, userIds, skip, limit }) {
+  const scoreMatch = { seasonId };
+  if (userIds) scoreMatch.userId = { $in: userIds };
+  const entries = await SeasonScore.aggregate([
+    { $match: scoreMatch },
+    { $lookup: { from: 'users', localField: 'userId', foreignField: '_id', as: 'user' } },
+    { $unwind: '$user' },
+    { $match: { 'user.isBanned': { $ne: true }, 'user.preferences.showLeaderboard': { $ne: false } } },
+    { $sort: { points: -1, _id: 1 } },
+    { $skip: skip },
+    { $limit: limit },
+    { $project: {
+      _id: '$user._id', username: '$user.username', totalWins: '$user.totalWins', totalGames: '$user.totalGames',
+      totalCorrect: '$user.totalCorrect', totalWrong: '$user.totalWrong', xp: '$points', level: '$user.level',
+      equippedItems: '$user.equippedItems', preferences: '$user.preferences',
+    } },
+  ]);
+  await User.populate(entries, ['equippedItems.avatar', 'equippedItems.border', 'equippedItems.buzzer']);
+  return entries.map((user) => addPresence(req, user));
+}
+
 router.get('/leaderboard', async (req, res) => {
   try {
     const { type, page = 1, limit = 50 } = req.query;
@@ -51,6 +74,7 @@ router.get('/leaderboard', async (req, res) => {
     const pageNum = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
     const limitNum = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50;
     const skip = (pageNum - 1) * limitNum;
+    const season = await getActiveSeason();
     if (type === 'friends') {
       const header = req.headers.authorization;
       if (!header || !header.startsWith('Bearer ')) {
@@ -69,29 +93,12 @@ router.get('/leaderboard', async (req, res) => {
       }
 
       const friendIds = [callerUser._id, ...(callerUser.friends || [])];
-      const friendUsers = await User.find({ _id: { $in: friendIds }, 'preferences.showLeaderboard': { $ne: false } })
-        .sort({ xp: -1, totalWins: -1 })
-        .skip(skip)
-        .limit(limitNum)
-        .select('username totalWins totalGames totalCorrect totalWrong xp level equippedItems preferences')
-        .populate('equippedItems.avatar')
-        .populate('equippedItems.border')
-        .populate('equippedItems.buzzer')
-        .lean();
-
-      return res.json(friendUsers.map((user) => addPresence(req, user)));
+      const entries = await seasonLeaderboardEntries(req, { seasonId: season._id, userIds: friendIds, skip, limit: limitNum });
+      return res.json({ entries, season: serializeSeason(season) });
     }
 
-    const topUsers = await User.find({ 'preferences.showLeaderboard': { $ne: false } })
-      .sort({ xp: -1, totalWins: -1 })
-      .skip(skip)
-      .limit(limitNum)
-      .select('username totalWins totalGames totalCorrect totalWrong xp level equippedItems preferences')
-      .populate('equippedItems.avatar')
-      .populate('equippedItems.border')
-      .populate('equippedItems.buzzer')
-      .lean();
-    res.json(topUsers.map((user) => addPresence(req, user)));
+    const entries = await seasonLeaderboardEntries(req, { seasonId: season._id, skip, limit: limitNum });
+    res.json({ entries, season: serializeSeason(season) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -601,16 +608,26 @@ router.post('/spin-wheel', auth, async (req, res) => {
 // ── GET Another User Profile & Relationship Status ──
 router.get('/season-rank/:id', auth, async (req, res) => {
   try {
-    const targetUser = await User.findById(req.params.id).select('xp').lean();
+    const targetUser = await User.findById(req.params.id).select('_id').lean();
     if (!targetUser) return res.status(404).json({ error: 'User not found' });
-    const activeFilter = { isBanned: { $ne: true } };
-    const [higherScores, totalPlayers] = await Promise.all([
-      User.countDocuments({ ...activeFilter, xp: { $gt: targetUser.xp || 0 } }),
-      User.countDocuments(activeFilter),
+    const season = await getActiveSeason();
+    const score = await SeasonScore.findOne({ seasonId: season._id, userId: targetUser._id }).select('points').lean();
+    const targetPoints = score?.points || 0;
+    const eligiblePipeline = [
+      { $match: { seasonId: season._id } },
+      { $lookup: { from: 'users', localField: 'userId', foreignField: '_id', as: 'user' } },
+      { $unwind: '$user' },
+      { $match: { 'user.isBanned': { $ne: true }, 'user.preferences.showLeaderboard': { $ne: false } } },
+    ];
+    const [higherResult, totalResult] = await Promise.all([
+      SeasonScore.aggregate([...eligiblePipeline, { $match: { points: { $gt: targetPoints } } }, { $count: 'count' }]),
+      SeasonScore.aggregate([...eligiblePipeline, { $count: 'count' }]),
     ]);
+    const higherScores = higherResult[0]?.count || 0;
+    const totalPlayers = totalResult[0]?.count || 0;
     const rank = higherScores + 1;
     const topPercent = totalPlayers > 0 ? Math.max(1, Math.ceil((rank / totalPlayers) * 100)) : 100;
-    res.json({ rank, totalPlayers, topPercent });
+    res.json({ rank, totalPlayers, topPercent, points: targetPoints, season: serializeSeason(season) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

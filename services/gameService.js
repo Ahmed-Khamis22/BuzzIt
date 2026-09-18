@@ -1,5 +1,6 @@
 const GameHistory = require('../models/GameHistory');
 const User = require('../models/User');
+const { recordSeasonPoints } = require('./seasonService');
 
 const AVAILABLE_ACHIEVEMENTS = [
   { id: 'first_game', name: 'أول خطوة', condition: (u) => u.totalGames >= 1, reward: 200 },
@@ -77,6 +78,7 @@ async function awardSoloProgress(userId, { xp, won = false, correct = 0, wrong =
     { new: true }
   );
   if (!updatedUser) return null;
+  await recordSeasonPoints(userId, xp);
   const progression = await syncProgression(updatedUser);
   return {
     xpEarned: xp,
@@ -170,6 +172,7 @@ async function saveGameResults(code, room) {
         );
 
         if (!updatedUser) return;
+        await recordSeasonPoints(p.userId, xpEarned);
         
         const { newlyUnlocked, achievementCoins } = await syncProgression(updatedUser);
         const totalCoinsToAward = baseCoinsEarned + achievementCoins;
@@ -192,6 +195,7 @@ async function saveGameResults(code, room) {
       { new: true }
     );
     if (hostUser) {
+      await recordSeasonPoints(room.hostUserId, 10);
       const { newlyUnlocked, achievementCoins } = await syncProgression(hostUser);
       coinsEarnedMap[room.hostUserId] = 30 + achievementCoins;
       xpEarnedMap[room.hostUserId] = 10;

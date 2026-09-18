@@ -4,6 +4,7 @@ const { rateLimit } = require('express-rate-limit');
 
 const Question = require('../models/Question');
 const User = require('../models/User');
+const { recordSeasonPoints } = require('../services/seasonService');
 const auth = require('../middleware/auth');
 const { aiJudge } = require('../services/aiJudge');
 const { getPersistentJudgment, savePersistentJudgment } = require('../services/soloJudgmentCache');
@@ -179,6 +180,7 @@ async function recordDontSayProgress(userId, challenge) {
     user.xp = (user.xp || 0) + 2;
     user.level = calculateLevel(user.xp);
     await user.save();
+    await recordSeasonPoints(userId, 2);
 
     challenge.progressSnapshot = {
       currentStreak,
