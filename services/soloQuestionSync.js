@@ -1,6 +1,6 @@
 const Question = require('../models/Question');
 const { buildManagedQuestionBank } = require('./gameQuestionBank');
-const GAME_QUESTION_BANK_VERSION = 1;
+const GAME_QUESTION_BANK_VERSION = 2;
 
 const BROAD_SOLO_QUESTIONS = [
   {

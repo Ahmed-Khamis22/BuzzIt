@@ -1179,6 +1179,10 @@ async function buildMatchStage(room) {
     if (activeCategories) matchStage.category = { $in: activeCategories };
   } else if (room.config?.gameMode === 'predict') {
     matchStage.category = 'predict-questions';
+    // Predict starts broad, then narrows after the early rounds without ever
+    // going below the six valid answers required by a six-player room.
+    const upcomingRound = (room.predictRound || 0) + 1;
+    matchStage.difficulty = upcomingRound <= 2 ? 'easy' : upcomingRound <= 4 ? 'medium' : 'hard';
   } else {
     matchStage.isCustomTrivia = { $ne: true };
     if (activeCategories) matchStage.category = { $in: activeCategories };

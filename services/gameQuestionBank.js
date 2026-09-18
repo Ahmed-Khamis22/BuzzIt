@@ -1,6 +1,5 @@
 // A curated, finite-answer foundation shared by the two word games.
-// Every topic has at least 12 ordinary, distinct answers: enough room for a
-// six-player Predict round and enough safe alternatives in Don't Say My Word.
+// Questions are deliberately short and direct: every player sees "اذكر ...".
 const TOPICS = [
   ['لون', ['أحمر', 'أزرق', 'أخضر', 'أصفر', 'أسود', 'أبيض', 'برتقالي', 'بنفسجي', 'وردي', 'بني', 'رمادي', 'ذهبي']],
   ['فاكهة', ['تفاح', 'موز', 'برتقال', 'عنب', 'مانجو', 'فراولة', 'بطيخ', 'خوخ', 'رمان', 'تين', 'كمثرى', 'جوافة']],
@@ -54,30 +53,44 @@ const TOPICS = [
   ['شيء في المكتبة', ['كتاب', 'رواية', 'مجلة', 'رف', 'مكتب', 'كرسي', 'قلم', 'كراسة', 'فهرس', 'أمين مكتبة', 'كمبيوتر', 'قاموس']],
 ];
 
-const SOLO_WORDINGS = [
-  (label) => `اذكر ${label}.`,
-  (label) => `قول اسم ${label} تعرفه.`,
-  (label) => `اكتب مثالًا على ${label}.`,
-  (label) => `اختار ${label} مشهور.`,
-  (label) => `هات ${label} من اللي تعرفهم.`,
-  (label) => `لو طلبنا منك ${label}، هتقول إيه؟`,
-  (label) => `اكتب ${label} واحد.`,
-  (label) => `قول أي ${label} صحيح.`,
-  (label) => `اذكر ${label} يعرفه أغلب الناس.`,
-  (label) => `اكتب اسم ${label} عادي ومتداول.`,
+// Solo-only late-streak questions. Each one is explicit about its smaller
+// answer set, so reduced options feel fair instead of arbitrary.
+const SOLO_HARD_TOPICS = [
+  ['لونًا من ألوان علم مصر', ['أحمر', 'أبيض', 'أسود']],
+  ['فصلًا من فصول السنة', ['الصيف', 'الشتاء', 'الربيع', 'الخريف']],
+  ['كوكبًا غازيًا', ['المشتري', 'زحل', 'أورانوس', 'نبتون']],
+  ['دولة من دول المغرب العربي', ['المغرب', 'الجزائر', 'تونس', 'ليبيا', 'موريتانيا']],
+  ['دولة اسكندنافية', ['السويد', 'النرويج', 'الدنمارك']],
+  ['فاكهة حمضية', ['برتقال', 'ليمون', 'يوسفي', 'جريب فروت']],
+  ['طائرًا لا يطير', ['بطريق', 'نعامة', 'كيوي']],
+  ['حيوانًا يعيش في الصحراء', ['جمل', 'ثعلب', 'عقرب', 'سحلية', 'ثعبان']],
+  ['آلة موسيقية من آلات النفخ', ['ناي', 'فلوت', 'ساكسفون', 'ترومبيت']],
+  ['رياضة قتالية أولمبية', ['ملاكمة', 'جودو', 'كاراتيه', 'مصارعة', 'تايكوندو']],
+  ['نوع خبز مصري', ['عيش بلدي', 'فينو', 'شامي', 'سن', 'توست']],
+  ['شيئًا يستخدمه طبيب الأسنان', ['مرآة أسنان', 'حفار', 'حقنة', 'جهاز شفط', 'فرشاة']],
+  ['دولة عربية تطل على الخليج العربي', ['السعودية', 'الكويت', 'قطر', 'البحرين', 'الإمارات', 'العراق']],
+  ['مدينة مصرية على البحر الأحمر', ['الغردقة', 'شرم الشيخ', 'مرسى علم', 'السويس', 'سفاجا']],
+  ['رياضة تُلعب بمضرب', ['تنس', 'تنس طاولة', 'اسكواش', 'ريشة طائرة']],
+  ['حلوى رمضانية', ['كنافة', 'قطايف', 'بلح الشام', 'بسبوسة', 'لقمة القاضي']],
+  ['وسيلة مواصلات تسير على قضبان', ['قطار', 'مترو', 'ترام']],
+  ['شيئًا تجده في حقيبة الإسعافات الأولية', ['شاش', 'قطن', 'مطهر', 'لاصق جروح', 'مسكن']],
+  ['دولة عربية في أفريقيا', ['مصر', 'المغرب', 'الجزائر', 'تونس', 'السودان', 'ليبيا', 'موريتانيا']],
+  ['شكلاً هندسيًا له أربعة أضلاع', ['مربع', 'مستطيل', 'معين', 'شبه منحرف']],
 ];
 
-const PREDICT_WORDINGS = [
-  (label) => `اذكر ${label}.`,
-  (label) => `اكتب ${label} تتوقع إن ناس كتير هتقوله.`,
-  (label) => `قول ${label} معروف.`,
-  (label) => `اختار ${label} يخطر على بالك بسرعة.`,
-  (label) => `لو سألك حد عن ${label}، هترد بإيه؟`,
-  (label) => `اذكر ${label} من الحاجات المشهورة.`,
-  (label) => `قول اسم ${label} عادي ومتداول.`,
-  (label) => `هات ${label} تعرفه أغلب الناس.`,
-  (label) => `اكتب ${label} متوقع.`,
-  (label) => `قول ${label} واحد.`,
+// These become the late rounds in Predict. Every prompt still has six or
+// more natural answers, which is the minimum needed for a six-player room.
+const PREDICT_HARD_TOPICS = [
+  ['دولة عربية تطل على الخليج العربي', ['السعودية', 'الكويت', 'قطر', 'البحرين', 'الإمارات', 'العراق']],
+  ['دولة عربية في أفريقيا', ['مصر', 'المغرب', 'الجزائر', 'تونس', 'السودان', 'ليبيا', 'موريتانيا']],
+  ['مادة دراسية علمية', ['فيزياء', 'كيمياء', 'أحياء', 'علوم', 'جيولوجيا', 'فلك']],
+  ['رياضة جماعية تُلعب بالكرة', ['كرة القدم', 'كرة السلة', 'كرة اليد', 'كرة الطائرة', 'هوكي', 'بيسبول']],
+  ['طعامًا يؤكل في الإفطار', ['فول', 'بيض', 'جبنة', 'فلافل', 'مربى', 'عيش']],
+  ['شيئًا تجده في حقيبة المدرسة', ['كتاب', 'كراسة', 'قلم', 'ممحاة', 'مسطرة', 'مبراة']],
+  ['وسيلة مواصلات برية', ['سيارة', 'أتوبيس', 'مترو', 'قطار', 'تاكسي', 'دراجة']],
+  ['شيئًا تجده في المطبخ', ['طبق', 'كوباية', 'ملعقة', 'شوكة', 'سكينة', 'حلة']],
+  ['تطبيق مراسلة', ['واتساب', 'ماسنجر', 'تيليجرام', 'سيجنال', 'فايبر', 'ديسكورد']],
+  ['فاكهة صيفية', ['بطيخ', 'مانجو', 'عنب', 'خوخ', 'تين', 'شمام']],
 ];
 
 function buildManagedQuestionBank() {
@@ -85,29 +98,33 @@ function buildManagedQuestionBank() {
   const predictQuestions = [];
   TOPICS.forEach(([label, answers], topicIndex) => {
     if (answers.length < 7) throw new Error(`Question topic has too few answers: ${label}`);
-    SOLO_WORDINGS.forEach((wording, variationIndex) => {
-      const answer = answers[variationIndex % answers.length];
-      soloQuestions.push({
-        bankKey: `solo-${topicIndex}-${variationIndex}`,
-        text: wording(label),
-        category: 'dont-say-my-word',
-        answer,
-        acceptedAnswers: answers.filter((value) => value !== answer),
-        judgeMode: 'closed',
-        difficulty: 'medium',
-      });
+    const difficulty = topicIndex < 10 ? 'easy' : 'medium';
+    const answer = answers[topicIndex % answers.length];
+    soloQuestions.push({
+      bankKey: `solo-${topicIndex}`,
+      text: `اذكر ${label}.`,
+      category: 'dont-say-my-word', answer,
+      acceptedAnswers: answers.filter((value) => value !== answer),
+      judgeMode: 'closed', difficulty,
     });
-    PREDICT_WORDINGS.forEach((wording, variationIndex) => {
-      predictQuestions.push({
-        bankKey: `predict-${topicIndex}-${variationIndex}`,
-        text: wording(label),
-        category: 'predict-questions',
-        answer: 'إجابة مفتوحة',
-        acceptedAnswers: [],
-        judgeMode: 'open',
-        judgeEvaluated: true,
-        difficulty: 'medium',
-      });
+    predictQuestions.push({
+      bankKey: `predict-${topicIndex}`,
+      text: `اذكر ${label}.`,
+      category: 'predict-questions', answer: 'إجابة مفتوحة', acceptedAnswers: [],
+      judgeMode: 'open', judgeEvaluated: true, difficulty,
+    });
+  });
+  SOLO_HARD_TOPICS.forEach(([label, answers], index) => {
+    const answer = answers[index % answers.length];
+    soloQuestions.push({
+      bankKey: `solo-hard-${index}`, text: `اذكر ${label}.`, category: 'dont-say-my-word',
+      answer, acceptedAnswers: answers.filter((value) => value !== answer), judgeMode: 'closed', difficulty: 'hard',
+    });
+  });
+  PREDICT_HARD_TOPICS.forEach(([label], index) => {
+    predictQuestions.push({
+      bankKey: `predict-hard-${index}`, text: `اذكر ${label}.`, category: 'predict-questions',
+      answer: 'إجابة مفتوحة', acceptedAnswers: [], judgeMode: 'open', judgeEvaluated: true, difficulty: 'hard',
     });
   });
   return { soloQuestions, predictQuestions };
