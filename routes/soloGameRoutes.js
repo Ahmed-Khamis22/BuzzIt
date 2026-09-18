@@ -226,11 +226,16 @@ router.get('/dont-say-my-word', auth, async (req, res) => {
     const orderedPool = buildDifficultyCurve(pool, pool.length);
     const batchSize = Math.min(40, Math.max(10, Number(req.query?.limit) || 25));
     const questions = Array.from({ length: batchSize }, (_, offset) => orderedPool[(requestedStreak + offset) % orderedPool.length]);
-    const user = await User.findById(req.userId).select('soloStats.dontSayMyWord').lean();
-    const stored = user?.soloStats?.dontSayMyWord || {};
+    // A new streak is one played solo game. Its result is intentionally not a
+    // normal win: the player can keep an open-ended streak instead.
+    const gameProgress = newRun
+      ? await awardSoloProgress(req.userId, { xp: 0, won: false })
+      : null;
     if (newRun) {
       await User.updateOne({ _id: req.userId }, { $set: { 'soloStats.dontSayMyWord.currentStreak': 0 } });
     }
+    const user = await User.findById(req.userId).select('soloStats.dontSayMyWord').lean();
+    const stored = user?.soloStats?.dontSayMyWord || {};
     res.json({
       questions: questions.map((question, index) => createChallenge(question, req.userId, requestedStreak + index)),
       stats: {
@@ -239,6 +244,7 @@ router.get('/dont-say-my-word', auth, async (req, res) => {
         points: stored.points || 0,
       },
       totalQuestionBank: pool.length,
+      ...(gameProgress ? { gameProgress } : {}),
     });
   } catch (error) {
     res.status(500).json({ error: 'SOLO_GAME_LOAD_FAILED' });
@@ -458,8 +464,9 @@ router.post('/dont-say-my-word/complete', auth, async (req, res) => {
   try {
     const progress = await awardSoloProgress(req.userId, {
       xp: 50,
-      won: true,
+      won: false,
       correct: 10,
+      countGame: false,
     });
     if (!progress) return res.status(404).json({ error: 'USER_NOT_FOUND' });
     return res.json(progress);
@@ -469,7 +476,7 @@ router.post('/dont-say-my-word/complete', auth, async (req, res) => {
   }
 });
 
-router.post('/ten-by-ten/start', auth, judgeLimiter, (req, res) => {
+router.post('/ten-by-ten/start', auth, judgeLimiter, async (req, res) => {
   pruneTenByTenSessions();
   for (const [sessionId, session] of tenByTenSessions.entries()) {
     if (session.userId === String(req.userId)) tenByTenSessions.delete(sessionId);
@@ -487,7 +494,13 @@ router.post('/ten-by-ten/start', auth, judgeLimiter, (req, res) => {
     updatedAt: Date.now(),
   });
   tenByTenSessions.set(session.id, session);
-  return res.json(publicSession(session));
+  try {
+    const gameProgress = await awardSoloProgress(req.userId, { xp: 0, won: false });
+    return res.json(publicSession(session, { gameProgress }));
+  } catch (error) {
+    tenByTenSessions.delete(session.id);
+    return res.status(500).json({ error: 'SOLO_GAME_START_FAILED' });
+  }
 });
 
 router.post('/ten-by-ten/abandon', auth, (req, res) => {
@@ -628,6 +641,7 @@ router.post('/ten-by-ten/turn', auth, judgeLimiter, async (req, res) => {
         won,
         correct: won ? 1 : 0,
         wrong: won ? 0 : 1,
+        countGame: false,
       });
     } catch (error) {
       session.xpAwarded = false;

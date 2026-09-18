@@ -63,12 +63,18 @@ async function syncProgression(user) {
   return { newlyUnlocked, achievementCoins };
 }
 
-async function awardSoloProgress(userId, { xp, won = false, correct = 0, wrong = 0 }) {
+async function awardSoloProgress(userId, {
+  xp,
+  won = false,
+  correct = 0,
+  wrong = 0,
+  countGame = true,
+}) {
   const updatedUser = await User.findByIdAndUpdate(
     userId,
     {
       $inc: {
-        totalGames: 1,
+        totalGames: countGame ? 1 : 0,
         totalWins: won ? 1 : 0,
         totalCorrect: correct,
         totalWrong: wrong,
