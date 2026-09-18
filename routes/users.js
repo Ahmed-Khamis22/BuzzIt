@@ -66,6 +66,24 @@ async function seasonLeaderboardEntries(req, { seasonId, userIds, skip, limit })
   return entries.map((user) => addPresence(req, user));
 }
 
+// Season 1 is the already-running public ranking. Read it exactly as it was
+// (lifetime XP) so existing players stay visible; Season 2 onward uses the
+// isolated per-season score table and starts fresh automatically.
+async function legacyLeaderboardEntries(req, { userIds, skip, limit }) {
+  const filter = { isBanned: { $ne: true }, 'preferences.showLeaderboard': { $ne: false } };
+  if (userIds) filter._id = { $in: userIds };
+  const entries = await User.find(filter)
+    .sort({ xp: -1, totalWins: -1 })
+    .skip(skip)
+    .limit(limit)
+    .select('username totalWins totalGames totalCorrect totalWrong xp level equippedItems preferences')
+    .populate('equippedItems.avatar')
+    .populate('equippedItems.border')
+    .populate('equippedItems.buzzer')
+    .lean();
+  return entries.map((user) => addPresence(req, user));
+}
+
 router.get('/leaderboard', async (req, res) => {
   try {
     const { type, page = 1, limit = 50 } = req.query;
@@ -93,11 +111,15 @@ router.get('/leaderboard', async (req, res) => {
       }
 
       const friendIds = [callerUser._id, ...(callerUser.friends || [])];
-      const entries = await seasonLeaderboardEntries(req, { seasonId: season._id, userIds: friendIds, skip, limit: limitNum });
+      const entries = season.number === 1
+        ? await legacyLeaderboardEntries(req, { userIds: friendIds, skip, limit: limitNum })
+        : await seasonLeaderboardEntries(req, { seasonId: season._id, userIds: friendIds, skip, limit: limitNum });
       return res.json({ entries, season: serializeSeason(season) });
     }
 
-    const entries = await seasonLeaderboardEntries(req, { seasonId: season._id, skip, limit: limitNum });
+    const entries = season.number === 1
+      ? await legacyLeaderboardEntries(req, { skip, limit: limitNum })
+      : await seasonLeaderboardEntries(req, { seasonId: season._id, skip, limit: limitNum });
     res.json({ entries, season: serializeSeason(season) });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -611,6 +633,17 @@ router.get('/season-rank/:id', auth, async (req, res) => {
     const targetUser = await User.findById(req.params.id).select('_id').lean();
     if (!targetUser) return res.status(404).json({ error: 'User not found' });
     const season = await getActiveSeason();
+    if (season.number === 1) {
+      const rankedUser = await User.findById(targetUser._id).select('xp').lean();
+      const activeFilter = { isBanned: { $ne: true }, 'preferences.showLeaderboard': { $ne: false } };
+      const [higherScores, totalPlayers] = await Promise.all([
+        User.countDocuments({ ...activeFilter, xp: { $gt: rankedUser?.xp || 0 } }),
+        User.countDocuments(activeFilter),
+      ]);
+      const rank = higherScores + 1;
+      const topPercent = totalPlayers > 0 ? Math.max(1, Math.ceil((rank / totalPlayers) * 100)) : 100;
+      return res.json({ rank, totalPlayers, topPercent, points: rankedUser?.xp || 0, season: serializeSeason(season) });
+    }
     const score = await SeasonScore.findOne({ seasonId: season._id, userId: targetUser._id }).select('points').lean();
     const targetPoints = score?.points || 0;
     const eligiblePipeline = [
