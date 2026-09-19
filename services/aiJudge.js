@@ -316,6 +316,11 @@ class AiJudge {
     this.env = env;
     this.http = http;
     const today = getTodayKey();
+    // This is a server-side safety budget for the whole AI feature. Provider
+    // quotas are not always identical to the limits configured in their
+    // dashboards, so stop before a sudden burst can spend through a free tier
+    // or a paid balance. Operators can raise it in Render when demand proves it.
+    this.dailyRequestLimit = Math.max(1, Number(env.AI_DAILY_REQUEST_LIMIT) || 1200);
     // Provider order and paid-emergency procedure:
     // docs/AI_FALLBACK_RUNBOOK.md
     this.providers = [
@@ -391,7 +396,28 @@ class AiJudge {
 
   availableProviders() {
     const now = Date.now();
-    return this.providers.filter((provider) => provider.configured && provider.disabledUntil <= now);
+    if (!this.hasGlobalDailyBudget()) return [];
+    return this.providers.filter((provider) => (
+      provider.configured
+      && provider.disabledUntil <= now
+      && this.hasProviderDailyBudget(provider)
+    ));
+  }
+
+  hasProviderDailyBudget(provider) {
+    this.checkDailyReset(provider);
+    return (provider.requestsToday || 0) < (provider.dailyLimit || 1);
+  }
+
+  totalRequestsToday() {
+    return this.providers.reduce((total, provider) => {
+      this.checkDailyReset(provider);
+      return total + (provider.requestsToday || 0);
+    }, 0);
+  }
+
+  hasGlobalDailyBudget() {
+    return this.totalRequestsToday() < this.dailyRequestLimit;
   }
 
   checkDailyReset(provider) {
@@ -460,14 +486,21 @@ class AiJudge {
     const causes = [];
 
     for (const provider of providers) {
-      const startedAt = Date.now();
-      try {
-        const value = await operation(provider);
-        this.markSuccess(provider, Date.now() - startedAt);
-        return { value, provider: provider.id };
-      } catch (error) {
-        causes.push(this.rememberProviderError(provider, error, 1, Date.now() - startedAt));
-        this.recordProviderFailure(provider, error);
+      // A malformed JSON response is not a provider outage. Give that same
+      // provider one clean retry before moving to the independent fallback.
+      // Every attempt still consumes the shared budget.
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        if (!this.hasGlobalDailyBudget() || !this.hasProviderDailyBudget(provider)) break;
+        const startedAt = Date.now();
+        try {
+          const value = await operation(provider);
+          this.markSuccess(provider, Date.now() - startedAt);
+          return { value, provider: provider.id };
+        } catch (error) {
+          causes.push(this.rememberProviderError(provider, error, attempt, Date.now() - startedAt));
+          this.recordProviderFailure(provider, error);
+          if (!isStructuredOutputError(error) || attempt === 2) break;
+        }
       }
     }
 
@@ -758,7 +791,7 @@ class AiJudge {
     const now = Date.now();
 
     let totalRequestsToday = 0;
-    let totalDailyLimit = 0;
+    let providerDailyLimit = 0;
     let totalSuccessfulToday = 0;
     let totalFailedToday = 0;
 
@@ -772,7 +805,7 @@ class AiJudge {
       const usagePercent = Math.min(100, Math.round((requestsToday / dailyLimit) * 100));
 
       totalRequestsToday += requestsToday;
-      totalDailyLimit += dailyLimit;
+      providerDailyLimit += dailyLimit;
       totalSuccessfulToday += successfulToday;
       totalFailedToday += failedToday;
 
@@ -792,18 +825,19 @@ class AiJudge {
       };
     });
 
-    const totalRemainingToday = Math.max(0, totalDailyLimit - totalRequestsToday);
-    const overallUsagePercent = totalDailyLimit > 0 ? Math.min(100, Math.round((totalRequestsToday / totalDailyLimit) * 100)) : 0;
+    const totalRemainingToday = Math.max(0, this.dailyRequestLimit - totalRequestsToday);
+    const overallUsagePercent = Math.min(100, Math.round((totalRequestsToday / this.dailyRequestLimit) * 100));
 
     return {
       available: available.length > 0,
       reason: available.length > 0 ? null : 'PROVIDERS_UNAVAILABLE',
       totalRequestsToday,
-      totalDailyLimit,
+      totalDailyLimit: this.dailyRequestLimit,
       totalRemainingToday,
       totalSuccessfulToday,
       totalFailedToday,
       overallUsagePercent,
+      providerDailyLimit,
       providers: mappedProviders,
     };
   }

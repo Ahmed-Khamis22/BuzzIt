@@ -15,6 +15,40 @@ test('AI judging is unavailable when no backend provider is configured', async (
   });
 });
 
+test('AI stops using providers after the configured shared daily budget', async () => {
+  let calls = 0;
+  const judge = new AiJudge({
+    env: { GEMINI_API_KEY: 'test-key', AI_DAILY_REQUEST_LIMIT: '1' },
+    http: {
+      post: async () => {
+        calls += 1;
+        return googleResponse({
+          answers: [{ id: 'P1', relevant: true, confidence: 0.99, reason: 'صحيحة' }],
+          semanticMatches: [],
+        });
+      },
+    },
+  });
+
+  await judge.judgePredictRound({
+    question: 'اذكر لونًا',
+    answers: [{ playerId: 'socket-a', answer: 'أزرق' }],
+  });
+  await assert.rejects(
+    judge.judgePredictRound({
+      question: 'اذكر لونًا',
+      answers: [{ playerId: 'socket-b', answer: 'أحمر' }],
+    }),
+    { message: 'AI_JUDGING_UNAVAILABLE' },
+  );
+
+  assert.equal(calls, 1);
+  const status = await judge.getStatus();
+  assert.equal(status.totalRequestsToday, 1);
+  assert.equal(status.totalRemainingToday, 0);
+  assert.equal(status.available, false);
+});
+
 test('Google judgment maps anonymous IDs and only rejects high-confidence decisions', async () => {
   const http = {
     post: async () => googleResponse({

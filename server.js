@@ -140,6 +140,31 @@ const io = new Server(server);
 const rooms = {};
 const connectedUsers = new Map();
 const PREDICT_AI_TAKEOVER_GRACE_MS = 10_000;
+// A small beta guard keeps an unexpected public spike from slowing every
+// active match on a single free Render instance. Set to a higher number in
+// Render once the service has been upgraded and load-tested.
+const MAX_ACTIVE_MULTIPLAYER_PLAYERS = Math.max(1, Number(process.env.MAX_ACTIVE_MULTIPLAYER_PLAYERS) || 50);
+
+function activeMultiplayerParticipantIds() {
+  const participants = new Set();
+  for (const room of Object.values(rooms)) {
+    if (!room || !['LOBBY', 'PLAYING'].includes(room.status)) continue;
+    if (room.host && !room.hostDisconnected) participants.add(room.host);
+    for (const [playerId, player] of Object.entries(room.players || {})) {
+      if (!player.disconnected) participants.add(playerId);
+    }
+  }
+  return participants;
+}
+
+function hasMultiplayerCapacityFor(socketId) {
+  const activeParticipants = activeMultiplayerParticipantIds();
+  return activeParticipants.has(socketId) || activeParticipants.size < MAX_ACTIVE_MULTIPLAYER_PLAYERS;
+}
+
+function multiplayerCapacityMessage() {
+  return `السيرفر التجريبي مشغول حاليًا (${MAX_ACTIVE_MULTIPLAYER_PLAYERS} لاعب). جرّب بعد دقائق.`;
+}
 
 // REST routes (friend requests) and Socket.IO share the same live-user
 // registry. Requests are still persisted in MongoDB; this is only the
@@ -1905,6 +1930,10 @@ io.on('connection', (socket) => {
   // حكم بيعمل روم
   socket.on('create-room', async (payload) => {
     const { hostName, config } = payload || {};
+    if (!hasMultiplayerCapacityFor(socket.id)) {
+      socket.emit('error', multiplayerCapacityMessage());
+      return;
+    }
     const verifiedHostUserId = socket.authUserId || null;
     const verifiedHostProfile = await getVerifiedRoomProfile(verifiedHostUserId);
     const verifiedHostEquippedItems = verifiedHostProfile?.equippedItems || null;
@@ -2064,6 +2093,10 @@ io.on('connection', (socket) => {
     }
 
     if (!reconnectingId) {
+      if (!hasMultiplayerCapacityFor(socket.id)) {
+        respond({ ok: false, reason: 'SERVER_BUSY' });
+        return socket.emit('error', multiplayerCapacityMessage());
+      }
       const supportsMidGameJoin = ['buzzer', 'trivia', 'draw'].includes(room.config?.gameMode || 'buzzer');
       if (room.status !== 'LOBBY' && !(room.status === 'PLAYING' && supportsMidGameJoin)) {
         respond({ ok: false, reason: 'GAME_IN_PROGRESS' });
