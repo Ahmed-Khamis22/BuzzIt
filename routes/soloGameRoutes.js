@@ -9,6 +9,7 @@ const auth = require('../middleware/auth');
 const { aiJudge } = require('../services/aiJudge');
 const { getPersistentJudgment, savePersistentJudgment } = require('../services/soloJudgmentCache');
 const { awardSoloProgress, calculateLevel } = require('../services/gameService');
+const { consumeAdView } = require('../services/adRewards');
 const {
   buildDifficultyCurve,
   evaluateContextualAnswer,
@@ -45,6 +46,7 @@ const RECENT_SECRET_HISTORY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const TEN_BY_TEN_DAILY_GAME_LIMIT = Math.max(1, Number(process.env.TEN_BY_TEN_DAILY_GAME_LIMIT) || 3);
 const TEN_BY_TEN_MAX_ACTIONS = Math.max(80, Number(process.env.TEN_BY_TEN_MAX_ACTIONS) || 120);
 const tenByTenDailyGames = new Map();
+const tenByTenExtraGames = new Map();
 
 // The database bank is the primary source. This embedded bank keeps the solo
 // game playable while a fresh deployment is still syncing Mongo questions.
@@ -103,12 +105,34 @@ function pruneTenByTenSessions() {
   for (const key of tenByTenDailyGames.keys()) {
     if (!key.endsWith(`:${today}`)) tenByTenDailyGames.delete(key);
   }
+  for (const key of tenByTenExtraGames.keys()) {
+    if (!key.endsWith(`:${today}`)) tenByTenExtraGames.delete(key);
+  }
+}
+
+function tenByTenDailyKey(userId) {
+  return `${String(userId)}:${new Date().toISOString().slice(0, 10)}`;
+}
+
+function getTenByTenAllowance(userId) {
+  const key = tenByTenDailyKey(userId);
+  const playedGamesToday = tenByTenDailyGames.get(key) || 0;
+  const extraGameClaimed = Boolean(tenByTenExtraGames.get(key));
+  const totalGamesToday = TEN_BY_TEN_DAILY_GAME_LIMIT + (extraGameClaimed ? 1 : 0);
+  return {
+    dailyGames: TEN_BY_TEN_DAILY_GAME_LIMIT,
+    playedGamesToday,
+    remainingGames: Math.max(0, totalGamesToday - playedGamesToday),
+    extraGameClaimed,
+    canWatchAdForExtraGame: playedGamesToday >= TEN_BY_TEN_DAILY_GAME_LIMIT && !extraGameClaimed,
+  };
 }
 
 function reserveTenByTenGame(userId) {
-  const key = `${String(userId)}:${new Date().toISOString().slice(0, 10)}`;
+  const key = tenByTenDailyKey(userId);
   const used = tenByTenDailyGames.get(key) || 0;
-  if (used >= TEN_BY_TEN_DAILY_GAME_LIMIT) return false;
+  const extraGameClaimed = Boolean(tenByTenExtraGames.get(key));
+  if (used >= TEN_BY_TEN_DAILY_GAME_LIMIT + (extraGameClaimed ? 1 : 0)) return false;
   tenByTenDailyGames.set(key, used + 1);
   return true;
 }
@@ -493,6 +517,28 @@ router.post('/dont-say-my-word/complete', auth, async (req, res) => {
     challenges.forEach((challenge) => { challenge.xpClaimed = false; });
     return res.status(500).json({ error: 'SOLO_PROGRESS_FAILED' });
   }
+});
+
+router.get('/ten-by-ten/allowance', auth, (req, res) => {
+  pruneTenByTenSessions();
+  return res.json(getTenByTenAllowance(req.userId));
+});
+
+router.post('/ten-by-ten/extra-game', auth, async (req, res) => {
+  pruneTenByTenSessions();
+  const allowance = getTenByTenAllowance(req.userId);
+  if (allowance.extraGameClaimed) {
+    return res.status(409).json({ error: 'TEN_BY_TEN_EXTRA_ALREADY_CLAIMED', message: 'استخدمت إعلانك الإضافي لليوم بالفعل.' });
+  }
+  if (allowance.playedGamesToday < TEN_BY_TEN_DAILY_GAME_LIMIT) {
+    return res.status(400).json({ error: 'TEN_BY_TEN_FREE_GAMES_REMAIN', message: 'ما زالت لديك ألعاب مجانية متاحة اليوم.' });
+  }
+
+  const view = await consumeAdView(req.userId, 'ten-by-ten-extra-game');
+  if (!view.ok) return res.status(402).json({ error: 'AD_NOT_VERIFIED', message: view.error });
+
+  tenByTenExtraGames.set(tenByTenDailyKey(req.userId), true);
+  return res.json({ ...getTenByTenAllowance(req.userId), verified: view.verified });
 });
 
 router.post('/ten-by-ten/start', auth, judgeLimiter, async (req, res) => {
