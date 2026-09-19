@@ -68,6 +68,8 @@ const userSchema = new mongoose.Schema({
   dailyDoubledAt: { type: Date, default: null },
   storeDailyRewardDay: { type: String, default: null },
   lastAdRewardAtByType: { type: Map, of: Date, default: {} },
+  adCurrencyRewardDay: { type: String, default: null },
+  adCurrencyRewardsClaimed: { type: Number, default: 0 },
   totalAdsWatched: { type: Number, default: 0 },
   dailyTasksDate: { type: Date, default: null },
   dailyTasksBaseline: {

@@ -340,22 +340,14 @@ router.post('/daily-tasks/claim', auth, async (req, res) => {
 // Fixed payouts for rewarded ads. The client sends a reward *type*, never an
 // amount — otherwise anyone can ask for any number of coins without an ad.
 const AD_REWARDS = {
-  coins: { field: 'coins', amount: 100 },
-  coins_20: { field: 'coins', amount: 20 },
-  gems: { field: 'gems', amount: 2 },
+  coins: { field: 'coins', amount: 200 },
+  coins_20: { field: 'coins', amount: 200 },
+  gems: { field: 'gems', amount: 5 },
 };
 
-// Each reward type gets its own clock: watching an ad for coins doesn't use up
-// your gems cooldown. 12h works out to twice a day per button — spread across
-// the day rather than a calendar-day count a player could empty right before
-// midnight and again right after, minutes apart.
-const AD_REWARD_COOLDOWN_MS = 12 * 60 * 60 * 1000;
-
-function formatWait(ms) {
-  const minutes = Math.ceil(ms / 60000);
-  if (minutes < 60) return `${minutes} دقيقة`;
-  return `${Math.ceil(minutes / 60)} ساعة`;
-}
+// Currency ads share one small daily wallet. A player can choose coins or
+// gems, but can never chain the separate buttons to drain the whole store.
+const AD_CURRENCY_REWARD_DAILY_LIMIT = 2;
 
 router.post('/claim-ad-reward', auth, async (req, res) => {
   try {
@@ -363,30 +355,41 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
     const reward = AD_REWARDS[rewardType];
     if (!reward) return res.status(400).json({ error: 'نوع المكافأة غير صالح.' });
 
-    const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
-    // Checked before spending the ad view — a player who's still on cooldown
-    // shouldn't lose the verified view; it stays unspent for their next claim.
-    const lastAt = user.lastAdRewardAtByType?.get(rewardType);
-    if (lastAt) {
-      const remaining = AD_REWARD_COOLDOWN_MS - (Date.now() - new Date(lastAt).getTime());
-      if (remaining > 0) {
-        return res.status(429).json({ error: `لازم تستنى ${formatWait(remaining)} قبل مكافأة الإعلان دي تاني.` });
-      }
+    const today = cairoDayKey();
+    // Reset happens atomically on the first request of Cairo's new calendar
+    // day. The second query then reserves a slot, preventing simultaneous
+    // reward claims from both passing the daily limit.
+    await User.updateOne(
+      { _id: req.userId, adCurrencyRewardDay: { $ne: today } },
+      { $set: { adCurrencyRewardDay: today, adCurrencyRewardsClaimed: 0 } },
+    );
+    const user = await User.findOneAndUpdate(
+      {
+        _id: req.userId,
+        adCurrencyRewardDay: today,
+        adCurrencyRewardsClaimed: { $lt: AD_CURRENCY_REWARD_DAILY_LIMIT },
+      },
+      { $inc: { adCurrencyRewardsClaimed: 1 } },
+      { new: true },
+    );
+    if (!user) {
+      return res.status(429).json({
+        error: `استخدمت إعلاني العملات المتاحين لليوم. ارجع بكرة.`,
+        code: 'DAILY_CURRENCY_AD_LIMIT',
+      });
     }
 
-    // Spend a Google-verified ad view. Before this existed, anyone holding
-    // their own token could POST here on a loop and collect the reward
-    // without ever loading an ad.
     const view = await consumeAdView(req.userId, `claim-ad-reward:${rewardType}`);
-    if (!view.ok) return res.status(402).json({ error: view.error });
+    if (!view.ok) {
+      await User.updateOne(
+        { _id: req.userId, adCurrencyRewardDay: today, adCurrencyRewardsClaimed: { $gt: 0 } },
+        { $inc: { adCurrencyRewardsClaimed: -1 } },
+      );
+      return res.status(402).json({ error: view.error });
+    }
 
     user[reward.field] += reward.amount;
     const claimedAt = new Date();
-    if (!user.lastAdRewardAtByType) user.lastAdRewardAtByType = new Map();
-    user.lastAdRewardAtByType.set(rewardType, claimedAt);
-    user.markModified('lastAdRewardAtByType'); // belt-and-suspenders for Mongoose Map change detection
     user.totalAdsWatched = (user.totalAdsWatched || 0) + 1;
     await user.save();
 
@@ -395,7 +398,8 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
       field: reward.field,
       coins: user.coins,
       gems: user.gems,
-      nextRewardAt: new Date(claimedAt.getTime() + AD_REWARD_COOLDOWN_MS),
+      dailyAdLimit: AD_CURRENCY_REWARD_DAILY_LIMIT,
+      remainingCurrencyAds: Math.max(0, AD_CURRENCY_REWARD_DAILY_LIMIT - user.adCurrencyRewardsClaimed),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
