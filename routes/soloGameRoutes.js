@@ -369,6 +369,7 @@ router.post('/dont-say-my-word/judge', auth, judgeLimiter, async (req, res) => {
           forbiddenWord: question.answer,
           acceptedAnswers: uniqueAlternatives(question),
           answer,
+          userId: req.userId,
         });
         judgmentSource = `ai:${judgment.provider}`;
         cacheJudgment(cacheKey, judgment);
@@ -557,6 +558,7 @@ router.post('/ten-by-ten/turn', auth, judgeLimiter, async (req, res) => {
           secretCategory: categoryForSecret(session.aiSecret) || session.category,
           question: text,
           history: session.playerHistory,
+          userId: req.userId,
         });
       const answer = localAnswer || {
         ...resolveInterpretedAnswer({ secretWord: session.aiSecret, judgment: aiAnswer }),
@@ -588,6 +590,7 @@ router.post('/ten-by-ten/turn', auth, judgeLimiter, async (req, res) => {
           aiHistory: session.aiHistory,
           attempt: session.aiActions + 1,
           strategy: session.aiQuestionStrategy,
+          userId: req.userId,
         });
         session.pendingAiMove = generated.move;
         provider = generated.provider;
@@ -619,6 +622,7 @@ router.post('/ten-by-ten/turn', auth, judgeLimiter, async (req, res) => {
           aiHistory: session.aiHistory,
           attempt: session.aiActions + 1,
           strategy: session.aiQuestionStrategy,
+          userId: req.userId,
         });
         session.pendingAiMove = generated.move;
         provider = generated.provider;

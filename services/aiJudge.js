@@ -321,6 +321,12 @@ class AiJudge {
     // dashboards, so stop before a sudden burst can spend through a free tier
     // or a paid balance. Operators can raise it in Render when demand proves it.
     this.dailyRequestLimit = Math.max(1, Number(env.AI_DAILY_REQUEST_LIMIT) || 1200);
+    // Solo AI games need their own fair-use ceiling too; otherwise one account
+    // can consume the shared budget meant for every player. This deliberately
+    // counts actual provider calls (including a retry), not ordinary local or
+    // cached answer checks.
+    this.userDailyRequestLimit = Math.max(1, Number(env.AI_USER_DAILY_REQUEST_LIMIT) || 20);
+    this.userRequests = new Map();
     // Provider order and paid-emergency procedure:
     // docs/AI_FALLBACK_RUNBOOK.md
     this.providers = [
@@ -420,6 +426,28 @@ class AiJudge {
     return this.totalRequestsToday() < this.dailyRequestLimit;
   }
 
+  reserveUserDailyBudget(userId) {
+    if (!userId) return;
+    const today = getTodayKey();
+    const normalizedUserId = String(userId);
+    const key = `${normalizedUserId}:${today}`;
+
+    // Keep the in-memory beta guard bounded as days and users accumulate.
+    if (this.userRequests.size >= 10_000) {
+      for (const storedKey of this.userRequests.keys()) {
+        if (!storedKey.endsWith(`:${today}`)) this.userRequests.delete(storedKey);
+      }
+    }
+
+    const used = this.userRequests.get(key) || 0;
+    if (used >= this.userDailyRequestLimit) {
+      const error = new Error('AI_USER_DAILY_LIMIT');
+      error.code = 'AI_USER_DAILY_LIMIT';
+      throw error;
+    }
+    this.userRequests.set(key, used + 1);
+  }
+
   checkDailyReset(provider) {
     const today = getTodayKey();
     if (provider.lastResetDay !== today) {
@@ -478,7 +506,7 @@ class AiJudge {
     return details;
   }
 
-  async runWithProviderFallback(operation, unavailableCode) {
+  async runWithProviderFallback(operation, unavailableCode, userId = null) {
     // Trying every configured provider and then retrying them can leave a
     // player waiting close to a minute during an outage. Two independent
     // providers give resilience while keeping an interactive turn bounded.
@@ -491,6 +519,10 @@ class AiJudge {
       // Every attempt still consumes the shared budget.
       for (let attempt = 1; attempt <= 2; attempt += 1) {
         if (!this.hasGlobalDailyBudget() || !this.hasProviderDailyBudget(provider)) break;
+        // A player's own allowance is not a provider failure. Reserve it
+        // before entering the provider try/catch so another player can keep
+        // using this healthy provider.
+        this.reserveUserDailyBudget(userId);
         const startedAt = Date.now();
         try {
           const value = await operation(provider);
@@ -634,7 +666,7 @@ class AiJudge {
     return { answer: result.value, provider: result.provider };
   }
 
-  async judgeDontSayMyWordAnswer({ question, forbiddenWord, acceptedAnswers = [], answer }) {
+  async judgeDontSayMyWordAnswer({ question, forbiddenWord, acceptedAnswers = [], answer, userId = null }) {
     if (!question || !forbiddenWord || !answer) {
       throw new Error('AI_SOLO_JUDGMENT_MISSING_INPUT');
     }
@@ -642,11 +674,11 @@ class AiJudge {
     const result = await this.runWithProviderFallback(async (provider) => {
       const raw = await provider.run(prompt, SOLO_ANSWER_SCHEMA);
       return parseSoloAnswerJudgment(raw);
-    }, 'AI_SOLO_JUDGING_UNAVAILABLE');
+    }, 'AI_SOLO_JUDGING_UNAVAILABLE', userId);
     return { ...result.value, provider: result.provider };
   }
 
-  async playTenByTenTurn({ secretWord, category, difficulty, playerQuestion, aiHistory = [] }) {
+  async playTenByTenTurn({ secretWord, category, difficulty, playerQuestion, aiHistory = [], userId = null }) {
     if (!secretWord || !playerQuestion) throw new Error('AI_TEN_BY_TEN_MISSING_INPUT');
     const history = aiHistory.slice(-12).map((item) => ({
       move: String(item.text || '').slice(0, 100),
@@ -673,11 +705,11 @@ class AiJudge {
     const result = await this.runWithProviderFallback(async (provider) => {
       const raw = await provider.run(prompt, TEN_BY_TEN_SCHEMA);
       return parseTenByTenTurn(raw);
-    }, 'AI_TEN_BY_TEN_UNAVAILABLE');
+    }, 'AI_TEN_BY_TEN_UNAVAILABLE', userId);
     return { ...result.value, provider: result.provider };
   }
 
-  async answerTenByTenQuestion({ secretWord, secretCategory = 'mixed', question, history = [] }) {
+  async answerTenByTenQuestion({ secretWord, secretCategory = 'mixed', question, history = [], userId = null }) {
     if (!secretWord || !question) throw new Error('AI_TEN_BY_TEN_ANSWER_MISSING_INPUT');
     const recentHistory = history.slice(-80).map((item) => ({
       question: String(item.text || '').slice(0, 160),
@@ -715,11 +747,11 @@ class AiJudge {
     const result = await this.runWithProviderFallback(async (provider) => {
       const raw = await provider.run(prompt, TEN_BY_TEN_ANSWER_SCHEMA);
       return parseTenByTenAnswer(raw);
-    }, 'AI_TEN_BY_TEN_ANSWER_UNAVAILABLE');
+    }, 'AI_TEN_BY_TEN_ANSWER_UNAVAILABLE', userId);
     return { ...result.value, provider: result.provider };
   }
 
-  async generateTenByTenMove({ category, difficulty, aiHistory = [], attempt = 1, limit = 10, strategy = 'balanced_split' }) {
+  async generateTenByTenMove({ category, difficulty, aiHistory = [], attempt = 1, limit = 10, strategy = 'balanced_split', userId = null }) {
     const history = aiHistory.slice(-80).map((item) => ({
       move: String(item.text || '').slice(0, 100),
       type: item.type === 'guess' ? 'guess' : 'question',
@@ -765,7 +797,7 @@ class AiJudge {
       const move = parseTenByTenMove(raw);
       if (isRedundantTenByTenMove(move, aiHistory)) throw new Error('AI_TEN_BY_TEN_REDUNDANT_MOVE');
       return move;
-    }, 'AI_TEN_BY_TEN_MOVE_UNAVAILABLE');
+    }, 'AI_TEN_BY_TEN_MOVE_UNAVAILABLE', userId);
     return { move: result.value, provider: result.provider };
   }
 
@@ -838,6 +870,7 @@ class AiJudge {
       totalFailedToday,
       overallUsagePercent,
       providerDailyLimit,
+      userDailyRequestLimit: this.userDailyRequestLimit,
       providers: mappedProviders,
     };
   }
