@@ -224,11 +224,12 @@ function createInitialAiMove(category) {
   return { type: 'question', isGuess: false, text: categoryQuestion[category] || 'هل الشيء الذي تفكر فيه كائن حي؟' };
 }
 
-function createSession({ userId, category, difficulty, excludedSecrets = [] }) {
+function createSession({ userId, category, difficulty, excludedSecrets = [], maxActions = 120 }) {
   const safeCategory = WORD_BANK[category] ? category : category === 'mixed' ? 'mixed' : 'mixed';
   const safeDifficulty = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
   const aiSecret = chooseSecret(safeCategory, excludedSecrets);
   const aiQuestionStrategy = AI_QUESTION_STRATEGIES[crypto.randomInt(AI_QUESTION_STRATEGIES.length)];
+  const safeMaxActions = Math.max(80, Math.min(200, Number(maxActions) || 120));
   return {
     id: crypto.randomBytes(18).toString('hex'),
     userId: String(userId),
@@ -238,6 +239,7 @@ function createSession({ userId, category, difficulty, excludedSecrets = [] }) {
     aiQuestionStrategy,
     playerActions: 0,
     aiActions: 0,
+    maxActions: safeMaxActions,
     playerSolvedAt: null,
     aiSolvedAt: null,
     status: 'playing',
@@ -284,6 +286,7 @@ function publicSession(session, extra = {}) {
     difficulty: session.difficulty,
     playerActions: session.playerActions,
     aiActions: session.aiActions,
+    maxActions: session.maxActions,
     playerSolvedAt: session.playerSolvedAt,
     aiSolvedAt: session.aiSolvedAt,
     status: session.status,

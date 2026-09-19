@@ -39,6 +39,12 @@ const tenByTenSessions = new Map();
 const recentTenByTenSecretsByUser = new Map();
 const RECENT_SECRET_HISTORY_MAX = 199;
 const RECENT_SECRET_HISTORY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+// A player should never lose AI in the middle of a long 10×10 match. Limit
+// completed starts per day instead of individual AI requests; the global AI
+// budget remains the protection against a whole-server spike.
+const TEN_BY_TEN_DAILY_GAME_LIMIT = Math.max(1, Number(process.env.TEN_BY_TEN_DAILY_GAME_LIMIT) || 3);
+const TEN_BY_TEN_MAX_ACTIONS = Math.max(80, Number(process.env.TEN_BY_TEN_MAX_ACTIONS) || 120);
+const tenByTenDailyGames = new Map();
 
 // The database bank is the primary source. This embedded bank keeps the solo
 // game playable while a fresh deployment is still syncing Mongo questions.
@@ -87,12 +93,24 @@ function clearUserChallenges(userId) {
 
 function pruneTenByTenSessions() {
   const now = Date.now();
+  const today = new Date().toISOString().slice(0, 10);
   for (const [sessionId, session] of tenByTenSessions.entries()) {
     if (session.expiresAt <= now) tenByTenSessions.delete(sessionId);
   }
   for (const [userId, history] of recentTenByTenSecretsByUser.entries()) {
     if (history.updatedAt + RECENT_SECRET_HISTORY_TTL_MS <= now) recentTenByTenSecretsByUser.delete(userId);
   }
+  for (const key of tenByTenDailyGames.keys()) {
+    if (!key.endsWith(`:${today}`)) tenByTenDailyGames.delete(key);
+  }
+}
+
+function reserveTenByTenGame(userId) {
+  const key = `${String(userId)}:${new Date().toISOString().slice(0, 10)}`;
+  const used = tenByTenDailyGames.get(key) || 0;
+  if (used >= TEN_BY_TEN_DAILY_GAME_LIMIT) return false;
+  tenByTenDailyGames.set(key, used + 1);
+  return true;
 }
 
 function getTenByTenSession(req) {
@@ -479,6 +497,12 @@ router.post('/dont-say-my-word/complete', auth, async (req, res) => {
 
 router.post('/ten-by-ten/start', auth, judgeLimiter, async (req, res) => {
   pruneTenByTenSessions();
+  if (!reserveTenByTenGame(req.userId)) {
+    return res.status(429).json({
+      error: 'TEN_BY_TEN_DAILY_LIMIT',
+      message: `خلصت ${TEN_BY_TEN_DAILY_GAME_LIMIT} تحديات 10×10 المتاحة النهارده. ارجع بكرة.`,
+    });
+  }
   for (const [sessionId, session] of tenByTenSessions.entries()) {
     if (session.userId === String(req.userId)) tenByTenSessions.delete(sessionId);
   }
@@ -489,6 +513,7 @@ router.post('/ten-by-ten/start', auth, judgeLimiter, async (req, res) => {
     category: String(req.body?.category || 'mixed'),
     difficulty: String(req.body?.difficulty || 'medium'),
     excludedSecrets: recentHistory,
+    maxActions: TEN_BY_TEN_MAX_ACTIONS,
   });
   recentTenByTenSecretsByUser.set(userKey, {
     secrets: [...recentHistory.filter((word) => word !== session.aiSecret), session.aiSecret].slice(-RECENT_SECRET_HISTORY_MAX),
@@ -518,6 +543,10 @@ router.post('/ten-by-ten/surrender', auth, (req, res) => {
   const session = getTenByTenSession(req);
   if (!session) return res.status(404).json({ error: 'TEN_BY_TEN_SESSION_NOT_FOUND' });
   if (session.status !== 'playing') return res.json(publicSession(session));
+  if ((session.playerActions + session.aiActions) >= session.maxActions) {
+    finishSession(session);
+    return res.json(publicSession(session, { actionLimitReached: true }));
+  }
 
   session.status = 'finished';
   session.phase = 'result';
@@ -558,7 +587,6 @@ router.post('/ten-by-ten/turn', auth, judgeLimiter, async (req, res) => {
           secretCategory: categoryForSecret(session.aiSecret) || session.category,
           question: text,
           history: session.playerHistory,
-          userId: req.userId,
         });
       const answer = localAnswer || {
         ...resolveInterpretedAnswer({ secretWord: session.aiSecret, judgment: aiAnswer }),
@@ -590,7 +618,6 @@ router.post('/ten-by-ten/turn', auth, judgeLimiter, async (req, res) => {
           aiHistory: session.aiHistory,
           attempt: session.aiActions + 1,
           strategy: session.aiQuestionStrategy,
-          userId: req.userId,
         });
         session.pendingAiMove = generated.move;
         provider = generated.provider;
@@ -622,7 +649,6 @@ router.post('/ten-by-ten/turn', auth, judgeLimiter, async (req, res) => {
           aiHistory: session.aiHistory,
           attempt: session.aiActions + 1,
           strategy: session.aiQuestionStrategy,
-          userId: req.userId,
         });
         session.pendingAiMove = generated.move;
         provider = generated.provider;

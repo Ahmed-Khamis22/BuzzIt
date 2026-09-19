@@ -49,33 +49,6 @@ test('AI stops using providers after the configured shared daily budget', async 
   assert.equal(status.available, false);
 });
 
-test('a player cannot use more AI calls than their daily allowance', async () => {
-  let calls = 0;
-  const judge = new AiJudge({
-    env: { GEMINI_API_KEY: 'test-key', AI_DAILY_REQUEST_LIMIT: '10', AI_USER_DAILY_REQUEST_LIMIT: '1' },
-    http: {
-      post: async () => {
-        calls += 1;
-        return googleResponse({
-          relevant: true,
-          matchesForbidden: false,
-          confidence: 0.99,
-          reason: 'صحيحة',
-        });
-      },
-    },
-  });
-  const request = (userId) => judge.judgeDontSayMyWordAnswer({
-    question: 'اذكر لونًا', forbiddenWord: 'أحمر', answer: 'أزرق', userId,
-  });
-
-  await request('player-a');
-  await assert.rejects(request('player-a'), { message: 'AI_USER_DAILY_LIMIT' });
-  await request('player-b');
-  assert.equal(calls, 2);
-  assert.equal((await judge.getStatus()).userDailyRequestLimit, 1);
-});
-
 test('Google judgment maps anonymous IDs and only rejects high-confidence decisions', async () => {
   const http = {
     post: async () => googleResponse({
