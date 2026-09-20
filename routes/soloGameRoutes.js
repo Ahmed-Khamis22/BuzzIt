@@ -583,7 +583,7 @@ router.post('/ten-by-ten/start', auth, judgeLimiter, async (req, res) => {
   if (!reserveTenByTenGame(req.userId)) {
     return res.status(429).json({
       error: 'TEN_BY_TEN_DAILY_LIMIT',
-      message: `خلصت ${TEN_BY_TEN_DAILY_GAME_LIMIT} تحديات 10×10 المتاحة النهارده. ارجع بكرة.`,
+      message: `خلصت ${TEN_BY_TEN_DAILY_GAME_LIMIT} تحديات في بالك إيه؟ المتاحة النهارده. ارجع بكرة.`,
     });
   }
   for (const [sessionId, session] of tenByTenSessions.entries()) {
