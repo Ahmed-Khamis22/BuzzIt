@@ -340,9 +340,9 @@ router.post('/daily-tasks/claim', auth, async (req, res) => {
 // Fixed payouts for rewarded ads. The client sends a reward *type*, never an
 // amount — otherwise anyone can ask for any number of coins without an ad.
 const AD_REWARDS = {
-  coins: { field: 'coins', amount: 200 },
-  coins_20: { field: 'coins', amount: 200 },
-  gems: { field: 'gems', amount: 5 },
+  coins: { field: 'coins', amount: 100 },
+  coins_20: { field: 'coins', amount: 100 },
+  gems: { field: 'gems', amount: 2 },
 };
 
 // Each optional reward has its own modest daily cap: three coin ads and three
