@@ -345,15 +345,19 @@ const AD_REWARDS = {
   gems: { field: 'gems', amount: 5 },
 };
 
-// Currency ads share one small daily wallet. A player can choose coins or
-// gems, but can never chain the separate buttons to drain the whole store.
-const AD_CURRENCY_REWARD_DAILY_LIMIT = 2;
+// Each optional reward has its own modest daily cap: three coin ads and three
+// gem ads. This makes ad inventory useful without turning either currency into
+// an unlimited faucet.
+const AD_CURRENCY_REWARD_DAILY_LIMIT = 3;
 
 router.post('/claim-ad-reward', auth, async (req, res) => {
   try {
     const { rewardType } = req.body;
     const reward = AD_REWARDS[rewardType];
     if (!reward) return res.status(400).json({ error: 'نوع المكافأة غير صالح.' });
+    // Keep the legacy coins_20 alias in the same bucket as coin rewards.
+    const rewardKey = reward.field === 'coins' ? 'coins' : 'gems';
+    const claimedPath = `adCurrencyRewardsClaimedByType.${rewardKey}`;
 
     const today = cairoDayKey();
     // Reset happens atomically on the first request of Cairo's new calendar
@@ -361,20 +365,20 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
     // reward claims from both passing the daily limit.
     await User.updateOne(
       { _id: req.userId, adCurrencyRewardDay: { $ne: today } },
-      { $set: { adCurrencyRewardDay: today, adCurrencyRewardsClaimed: 0 } },
+      { $set: { adCurrencyRewardDay: today, adCurrencyRewardsClaimed: 0, adCurrencyRewardsClaimedByType: {} } },
     );
     const user = await User.findOneAndUpdate(
       {
         _id: req.userId,
         adCurrencyRewardDay: today,
-        adCurrencyRewardsClaimed: { $lt: AD_CURRENCY_REWARD_DAILY_LIMIT },
+        [claimedPath]: { $lt: AD_CURRENCY_REWARD_DAILY_LIMIT },
       },
-      { $inc: { adCurrencyRewardsClaimed: 1 } },
+      { $inc: { [claimedPath]: 1 } },
       { new: true },
     );
     if (!user) {
       return res.status(429).json({
-        error: `استخدمت إعلاني العملات المتاحين لليوم. ارجع بكرة.`,
+        error: `استخدمت إعلانات ${rewardKey === 'coins' ? 'الكوينز' : 'الجواهر'} المتاحة لليوم. ارجع بكرة.`,
         code: 'DAILY_CURRENCY_AD_LIMIT',
       });
     }
@@ -382,8 +386,8 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
     const view = await consumeAdView(req.userId, `claim-ad-reward:${rewardType}`);
     if (!view.ok) {
       await User.updateOne(
-        { _id: req.userId, adCurrencyRewardDay: today, adCurrencyRewardsClaimed: { $gt: 0 } },
-        { $inc: { adCurrencyRewardsClaimed: -1 } },
+        { _id: req.userId, adCurrencyRewardDay: today, [claimedPath]: { $gt: 0 } },
+        { $inc: { [claimedPath]: -1 } },
       );
       return res.status(402).json({ error: view.error });
     }
@@ -399,7 +403,11 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
       coins: user.coins,
       gems: user.gems,
       dailyAdLimit: AD_CURRENCY_REWARD_DAILY_LIMIT,
-      remainingCurrencyAds: Math.max(0, AD_CURRENCY_REWARD_DAILY_LIMIT - user.adCurrencyRewardsClaimed),
+      remainingCurrencyAds: Math.max(0, AD_CURRENCY_REWARD_DAILY_LIMIT - (user.adCurrencyRewardsClaimedByType?.get(rewardKey) || 0)),
+      remainingCurrencyAdsByType: {
+        coins: Math.max(0, AD_CURRENCY_REWARD_DAILY_LIMIT - (user.adCurrencyRewardsClaimedByType?.get('coins') || 0)),
+        gems: Math.max(0, AD_CURRENCY_REWARD_DAILY_LIMIT - (user.adCurrencyRewardsClaimedByType?.get('gems') || 0)),
+      },
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -69,6 +69,9 @@ const userSchema = new mongoose.Schema({
   storeDailyRewardDay: { type: String, default: null },
   lastAdRewardAtByType: { type: Map, of: Date, default: {} },
   adCurrencyRewardDay: { type: String, default: null },
+  // Separate daily counters keep the optional coin and gem reward ads from
+  // competing with each other.
+  adCurrencyRewardsClaimedByType: { type: Map, of: Number, default: {} },
   adCurrencyRewardsClaimed: { type: Number, default: 0 },
   totalAdsWatched: { type: Number, default: 0 },
   dailyTasksDate: { type: Date, default: null },
