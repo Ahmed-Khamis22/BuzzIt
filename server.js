@@ -2493,11 +2493,21 @@ io.on('connection', (socket) => {
     // Only the judge starts the match — otherwise any player could force it.
     if (room.host !== socket.id) return;
 
-    // Require at least 2 active players to start (Production rule) — skipped only with explicit ALLOW_SOLO_TEST=true
+    // A written Buzzer host competes and is already in room.players, so they
+    // need only one joining opponent. A verbal Buzzer host is the judge and
+    // needs two joining competitors. Both cases mean two active player slots,
+    // but keep their errors explicit so the client and server describe the
+    // same rule.
     const activePlayersCount = Object.values(room.players).filter(p => !p.disconnected).length;
     const minimumPlayers = room.config?.gameMode === 'draw' ? 1 : 2;
     if (!ALLOW_SOLO_TEST && activePlayersCount < minimumPlayers) {
-      socket.emit('error', 'لا يمكن بدء اللعبة بأقل من لاعبين!');
+      const isWrittenBuzzer = room.config?.gameMode === 'buzzer' && room.config?.answerMode === 'written';
+      const isVerbalBuzzer = room.config?.gameMode === 'buzzer' && room.config?.answerMode === 'verbal';
+      socket.emit('error', isWrittenBuzzer
+        ? 'وضع الكتابة يحتاج لاعبًا واحدًا فقط معك لبدء اللعبة.'
+        : isVerbalBuzzer
+          ? 'وضع الشفاهية يحتاج لاعبين لأنك الحكم.'
+          : 'لا يمكن بدء اللعبة بأقل من لاعبين!');
       return;
     }
     if (!ALLOW_SOLO_TEST && room.config?.gameMode === 'predict') {
