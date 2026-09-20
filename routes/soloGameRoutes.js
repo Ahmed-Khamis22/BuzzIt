@@ -676,11 +676,8 @@ router.post('/ten-by-ten/turn', auth, judgeLimiter, async (req, res) => {
         provider: aiAnswer.provider,
       };
       playerAnswer = answer.answer;
-      if (aiAnswer?.reply) {
-        const normalizedReply = normalizeArabic(aiAnswer.reply);
-        const normalizedSecret = normalizeArabic(session.aiSecret);
-        if (!normalizedReply.includes(normalizedSecret)) playerAnswerText = aiAnswer.reply;
-      }
+      // The client renders the validated yes/no/unknown label. Extra AI prose
+      // made ordinary answers confusing and could accidentally reveal clues.
       provider = answer.provider || answer.source;
       if (answer.correctGuess) {
         session.playerSolvedAt = session.playerActions;

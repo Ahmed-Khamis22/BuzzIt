@@ -142,7 +142,7 @@ function outputTokenLimit(schema) {
   if (schema === BOT_ANSWER_SCHEMA) return 100;
   if (schema === SOLO_ANSWER_SCHEMA) return 180;
   if (schema === TEN_BY_TEN_SCHEMA) return 220;
-  if (schema === TEN_BY_TEN_ANSWER_SCHEMA) return 180;
+  if (schema === TEN_BY_TEN_ANSWER_SCHEMA) return 80;
   if (schema === TEN_BY_TEN_MOVE_SCHEMA) return 140;
   return 700;
 }
@@ -337,7 +337,7 @@ class AiJudge {
         successfulToday: 0,
         failedToday: 0,
         lastResetDay: today,
-        run: (prompt, schema) => this.runGoogle(prompt, schema),
+        run: (prompt, schema, timeoutMs) => this.runGoogle(prompt, schema, timeoutMs),
       },
       {
         id: 'groq',
@@ -352,7 +352,7 @@ class AiJudge {
         successfulToday: 0,
         failedToday: 0,
         lastResetDay: today,
-        run: (prompt, schema) => this.runGroq(prompt, schema),
+        run: (prompt, schema, timeoutMs) => this.runGroq(prompt, schema, timeoutMs),
       },
       {
         id: 'cerebras',
@@ -367,7 +367,7 @@ class AiJudge {
         successfulToday: 0,
         failedToday: 0,
         lastResetDay: today,
-        run: (prompt, schema) => this.runCerebras(prompt, schema),
+        run: (prompt, schema, timeoutMs) => this.runCerebras(prompt, schema, timeoutMs),
       },
       {
         id: 'cloudflare',
@@ -382,16 +382,16 @@ class AiJudge {
         successfulToday: 0,
         failedToday: 0,
         lastResetDay: today,
-        run: (prompt, schema) => this.runCloudflare(prompt, schema),
+        run: (prompt, schema, timeoutMs) => this.runCloudflare(prompt, schema, timeoutMs),
       },
     ];
     this.healthProbePromise = null;
   }
 
-  requestTimeout() {
+  requestTimeout(overrideMs = null) {
     // Solo rounds must feel instant. A provider that has not answered by this
     // point is less useful than the deterministic local/fail-open fallback.
-    return Math.max(3000, Number(this.env.AI_REQUEST_TIMEOUT_MS) || 6500);
+    return Math.max(3000, Number(overrideMs) || Number(this.env.AI_REQUEST_TIMEOUT_MS) || 6500);
   }
 
   availableProviders() {
@@ -478,18 +478,18 @@ class AiJudge {
     return details;
   }
 
-  async runWithProviderFallback(operation, unavailableCode) {
+  async runWithProviderFallback(operation, unavailableCode, { maxProviders = 2, maxAttempts = 2 } = {}) {
     // Trying every configured provider and then retrying them can leave a
     // player waiting close to a minute during an outage. Two independent
     // providers give resilience while keeping an interactive turn bounded.
-    const providers = this.availableProviders().slice(0, 2);
+    const providers = this.availableProviders().slice(0, maxProviders);
     const causes = [];
 
     for (const provider of providers) {
       // A malformed JSON response is not a provider outage. Give that same
       // provider one clean retry before moving to the independent fallback.
       // Every attempt still consumes the shared budget.
-      for (let attempt = 1; attempt <= 2; attempt += 1) {
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         if (!this.hasGlobalDailyBudget() || !this.hasProviderDailyBudget(provider)) break;
         const startedAt = Date.now();
         try {
@@ -499,7 +499,7 @@ class AiJudge {
         } catch (error) {
           causes.push(this.rememberProviderError(provider, error, attempt, Date.now() - startedAt));
           this.recordProviderFailure(provider, error);
-          if (!isStructuredOutputError(error) || attempt === 2) break;
+          if (!isStructuredOutputError(error) || attempt === maxAttempts) break;
         }
       }
     }
@@ -509,7 +509,7 @@ class AiJudge {
     throw error;
   }
 
-  async runGoogle(prompt, schema = JUDGMENT_SCHEMA) {
+  async runGoogle(prompt, schema = JUDGMENT_SCHEMA, timeoutMs = null) {
     const model = this.env.GEMMA_MODEL || DEFAULT_MODEL;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const response = await this.http.post(url, {
@@ -522,12 +522,12 @@ class AiJudge {
       },
     }, {
       headers: { 'x-goog-api-key': this.env.GEMINI_API_KEY, 'Content-Type': 'application/json' },
-      timeout: this.requestTimeout(),
+      timeout: this.requestTimeout(timeoutMs),
     });
     return response.data?.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('') || '';
   }
 
-  async runCerebras(prompt, schema = JUDGMENT_SCHEMA) {
+  async runCerebras(prompt, schema = JUDGMENT_SCHEMA, timeoutMs = null) {
     const model = this.env.CEREBRAS_MODEL || DEFAULT_CEREBRAS_MODEL;
     const response = await this.http.post('https://api.cerebras.ai/v1/chat/completions', {
       model,
@@ -541,12 +541,12 @@ class AiJudge {
       ...(model === 'gpt-oss-120b' ? { reasoning_effort: 'low' } : {}),
     }, {
       headers: { Authorization: `Bearer ${this.env.CEREBRAS_API_KEY}`, 'Content-Type': 'application/json' },
-      timeout: this.requestTimeout(),
+      timeout: this.requestTimeout(timeoutMs),
     });
     return response.data?.choices?.[0]?.message?.content || '';
   }
 
-  async runGroq(prompt, schema = JUDGMENT_SCHEMA) {
+  async runGroq(prompt, schema = JUDGMENT_SCHEMA, timeoutMs = null) {
     const model = this.env.GROQ_MODEL || DEFAULT_GROQ_MODEL;
     const response = await this.http.post('https://api.groq.com/openai/v1/chat/completions', {
       model,
@@ -562,12 +562,12 @@ class AiJudge {
         : {}),
     }, {
       headers: { Authorization: `Bearer ${this.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-      timeout: this.requestTimeout(),
+      timeout: this.requestTimeout(timeoutMs),
     });
     return response.data?.choices?.[0]?.message?.content || '';
   }
 
-  async runCloudflare(prompt, schema = JUDGMENT_SCHEMA) {
+  async runCloudflare(prompt, schema = JUDGMENT_SCHEMA, timeoutMs = null) {
     const model = this.env.CLOUDFLARE_AI_MODEL || DEFAULT_CF_MODEL;
     const accountId = encodeURIComponent(this.env.CLOUDFLARE_ACCOUNT_ID);
     const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
@@ -580,7 +580,7 @@ class AiJudge {
       response_format: { type: 'json_object' },
     }, {
       headers: { Authorization: `Bearer ${this.env.CLOUDFLARE_AI_TOKEN}`, 'Content-Type': 'application/json' },
-      timeout: this.requestTimeout(),
+      timeout: this.requestTimeout(timeoutMs),
     });
     return response.data?.result?.response
       || response.data?.result?.choices?.[0]?.message?.content
@@ -694,9 +694,7 @@ class AiJudge {
       'Reject accidental possibility: something being capable of entering a location, being used there once, or coexisting with something does not make that location/property characteristic of it.',
       'Purpose descriptions modify the type itself: a "place for X" means a place specifically intended or primarily known for X, not any large region where X can happen.',
       'Set reason to one short factual sentence that tests the canonicalClaim against the secret. Then choose yes only if that factual sentence supports the whole claim.',
-      'reply is the only text shown to the player. If the question is clear, reply must be only "نعم" or "لا". If it is genuinely ambiguous, reply may be one very short Egyptian-Arabic clarification of the interpretation, starting with نعم or لا.',
-      'When the wording combines a category with a location, purpose, use, or another property, reply must briefly confirm the chosen interpretation using "لو قصدك..." even if you can still decide yes or no.',
-      'The clarification must only rephrase the player intent. Never reveal the secret, its category, a new clue, the hidden factual reason, or more than 12 Arabic words.',
+      'reply must be exactly "نعم" for yes, "لا" for no, or "غير محدد" for unknown. Do not explain or add clues.',
       'أنت صاحب كلمة سرية في لعبة أسئلة نعم أو لا عربية.',
       `الكلمة السرية: ${String(secretWord).slice(0, 80)}`,
       `تصنيف الكلمة الحقيقي: ${String(secretCategory).slice(0, 40)}`,
@@ -713,9 +711,11 @@ class AiJudge {
       'أرجع JSON فقط بالشكل: {"answer":"yes","correctGuess":false,"intent":"question","guess":"","canonicalClaim":"الصفة الثابتة المقصودة","reason":"سبب واقعي قصير","reply":"نعم"}.',
     ].join('\n');
     const result = await this.runWithProviderFallback(async (provider) => {
-      const raw = await provider.run(prompt, TEN_BY_TEN_ANSWER_SCHEMA);
+      // This is an interactive button press. Two short independent attempts
+      // cap a bad-provider wait at about seven seconds instead of ~26 seconds.
+      const raw = await provider.run(prompt, TEN_BY_TEN_ANSWER_SCHEMA, 3500);
       return parseTenByTenAnswer(raw);
-    }, 'AI_TEN_BY_TEN_ANSWER_UNAVAILABLE');
+    }, 'AI_TEN_BY_TEN_ANSWER_UNAVAILABLE', { maxProviders: 2, maxAttempts: 1 });
     return { ...result.value, provider: result.provider };
   }
 
