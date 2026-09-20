@@ -8,6 +8,7 @@ const SeasonScore = require('../models/SeasonScore');
 const { getActiveSeason, serializeSeason } = require('../services/seasonService');
 
 const router = express.Router();
+const REMOVED_LEGACY_REWARD_MESSAGE = 'تم إيقاف هذه الميزة. هديتك اليومية موجودة الآن في المتجر.';
 
 const CAIRO_DAY_FORMATTER = new Intl.DateTimeFormat('en-US', {
   timeZone: 'Africa/Cairo',
@@ -202,6 +203,8 @@ function dailyStateFor(user) {
 
 // What the Home screen shows before the player taps anything.
 router.get('/daily-reward', auth, async (req, res) => {
+  return res.status(410).json({ error: REMOVED_LEGACY_REWARD_MESSAGE, code: 'LEGACY_REWARD_REMOVED' });
+  /* istanbul ignore next -- legacy implementation retained only for reference. */
   try {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -213,6 +216,8 @@ router.get('/daily-reward', auth, async (req, res) => {
 });
 
 router.post('/daily-reward', auth, async (req, res) => {
+  return res.status(410).json({ error: REMOVED_LEGACY_REWARD_MESSAGE, code: 'LEGACY_REWARD_REMOVED' });
+  /* istanbul ignore next -- legacy implementation retained only for reference. */
   try {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -236,6 +241,8 @@ router.post('/daily-reward', auth, async (req, res) => {
 // Doubling is a rewarded-ad perk: the server checks the claim happened today and
 // hasn't already been doubled, so the client can't ask for it twice.
 router.post('/daily-reward/double', auth, async (req, res) => {
+  return res.status(410).json({ error: REMOVED_LEGACY_REWARD_MESSAGE, code: 'LEGACY_REWARD_REMOVED' });
+  /* istanbul ignore next -- legacy implementation retained only for reference. */
   try {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -539,6 +546,8 @@ router.post('/exchange-gems-for-coins', auth, async (req, res) => {
 const EXTRA_SPINS_DAILY_CAP = 3;
 
 router.post('/grant-extra-spin', auth, async (req, res) => {
+  return res.status(410).json({ error: 'تم إيقاف عجلة الحظ.', code: 'SPIN_WHEEL_REMOVED' });
+  /* istanbul ignore next -- legacy implementation retained only for reference. */
   try {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -562,6 +571,8 @@ router.post('/grant-extra-spin', auth, async (req, res) => {
 });
 
 router.post('/spin-wheel', auth, async (req, res) => {
+  return res.status(410).json({ error: 'تم إيقاف عجلة الحظ.', code: 'SPIN_WHEEL_REMOVED' });
+  /* istanbul ignore next -- legacy implementation retained only for reference. */
   try {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
