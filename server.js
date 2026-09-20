@@ -433,7 +433,7 @@ function migrateHost(code) {
   }
 
   // Send promotion event to the new host
-  io.to(newHostId).emit('promoted-to-host', { status: room.status, reason: 'migration' });
+  io.to(newHostId).emit('promoted-to-host', { status: room.status, reason: 'migration', hostId: newHostId });
 
   // Send the current question's answer to the new host so they can view it.
   // Not in written mode — the new judge still plays and must stay blind.
@@ -444,7 +444,11 @@ function migrateHost(code) {
   }
 
   // Send update to the room
-  io.to(code).emit('host-changed', { hostName: newHostPlayer.name, hostId: newHostId });
+  io.to(code).emit('host-changed', {
+    hostName: newHostPlayer.name,
+    hostId: newHostId,
+    judge: judgeInfo(room),
+  });
   if (!hostKeepsPlaying) io.to(code).emit('player-removed', { id: newHostId });
 
   // Reset buzz state on migration
@@ -532,7 +536,7 @@ function rotateHost(code) {
 
   // Send demote event to old host and promote event to new host
   io.to(oldHostId).emit('demoted-to-player', { status: room.status });
-  io.to(newHostId).emit('promoted-to-host', { status: room.status, reason: 'rotation' });
+  io.to(newHostId).emit('promoted-to-host', { status: room.status, reason: 'rotation', hostId: newHostId });
 
   // Send the current question's answer to the new host so they can view it.
   // Not in written mode — the new judge still plays and must stay blind.
@@ -543,7 +547,11 @@ function rotateHost(code) {
   }
 
   // Update all players in the room about changes
-  io.to(code).emit('host-changed', { hostName: room.hostName });
+  io.to(code).emit('host-changed', {
+    hostName: room.hostName,
+    hostId: newHostId,
+    judge: judgeInfo(room),
+  });
   io.to(code).emit('player-removed', { id: newHostId });
   io.to(code).emit('player-joined', {
     id: oldHostId,
@@ -3353,7 +3361,10 @@ io.on('connection', (socket) => {
       }
     }
 
-    if (room.status === 'PLAYING' && room.config?.gameMode === 'predict' && room.players[socket.id]) {
+    // A Predict host is also a player, but their explicit exit must migrate
+    // control to a real connected player. Converting that host seat to AI
+    // first used to leave an AI socket as the room host with no human judge.
+    if (room.status === 'PLAYING' && room.config?.gameMode === 'predict' && room.host !== socket.id && room.players[socket.id]) {
       socket.leave(code);
       movePredictSeatToAi(code, socket.id);
       io.emit('public-rooms-update', getPublicRooms());
