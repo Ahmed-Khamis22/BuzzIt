@@ -47,6 +47,8 @@ const TEN_BY_TEN_DAILY_GAME_LIMIT = Math.max(1, Number(process.env.TEN_BY_TEN_DA
 const TEN_BY_TEN_MAX_ACTIONS = Math.max(80, Number(process.env.TEN_BY_TEN_MAX_ACTIONS) || 120);
 const tenByTenDailyGames = new Map();
 const tenByTenExtraGames = new Map();
+const DONT_SAY_MY_WORD_DAILY_GAME_LIMIT = Math.max(1, Number(process.env.DONT_SAY_MY_WORD_DAILY_GAME_LIMIT) || 3);
+const dontSayMyWordDailyGames = new Map();
 
 // The database bank is the primary source. This embedded bank keeps the solo
 // game playable while a fresh deployment is still syncing Mongo questions.
@@ -108,6 +110,9 @@ function pruneTenByTenSessions() {
   for (const key of tenByTenExtraGames.keys()) {
     if (!key.endsWith(`:${today}`)) tenByTenExtraGames.delete(key);
   }
+  for (const key of dontSayMyWordDailyGames.keys()) {
+    if (!key.endsWith(`:${today}`)) dontSayMyWordDailyGames.delete(key);
+  }
 }
 
 function tenByTenDailyKey(userId) {
@@ -134,6 +139,27 @@ function reserveTenByTenGame(userId) {
   const extraGameClaimed = Boolean(tenByTenExtraGames.get(key));
   if (used >= TEN_BY_TEN_DAILY_GAME_LIMIT + (extraGameClaimed ? 1 : 0)) return false;
   tenByTenDailyGames.set(key, used + 1);
+  return true;
+}
+
+function dontSayMyWordDailyKey(userId) {
+  return `${String(userId)}:${new Date().toISOString().slice(0, 10)}`;
+}
+
+function getDontSayMyWordAllowance(userId) {
+  const playedGamesToday = dontSayMyWordDailyGames.get(dontSayMyWordDailyKey(userId)) || 0;
+  return {
+    dailyGames: DONT_SAY_MY_WORD_DAILY_GAME_LIMIT,
+    playedGamesToday,
+    remainingGames: Math.max(0, DONT_SAY_MY_WORD_DAILY_GAME_LIMIT - playedGamesToday),
+  };
+}
+
+function reserveDontSayMyWordGame(userId) {
+  const key = dontSayMyWordDailyKey(userId);
+  const used = dontSayMyWordDailyGames.get(key) || 0;
+  if (used >= DONT_SAY_MY_WORD_DAILY_GAME_LIMIT) return false;
+  dontSayMyWordDailyGames.set(key, used + 1);
   return true;
 }
 
@@ -262,6 +288,12 @@ router.get('/dont-say-my-word', auth, async (req, res) => {
     pruneExpiredChallenges();
     const requestedStreak = Math.max(0, Number(req.query?.streak) || 0);
     const newRun = String(req.query?.newRun || '') === '1';
+    if (newRun && !reserveDontSayMyWordGame(req.userId)) {
+      return res.status(429).json({
+        error: 'DONT_SAY_MY_WORD_DAILY_LIMIT',
+        message: `خلصت ${DONT_SAY_MY_WORD_DAILY_GAME_LIMIT} ألعاب «ما تقولش كلمتي» المتاحة النهارده. ارجع بكرة.`,
+      });
+    }
     if (newRun) clearUserChallenges(req.userId);
     const pool = await loadQuestionPool();
     if (!pool.length) return res.status(404).json({ error: 'NO_SOLO_QUESTIONS' });
@@ -522,6 +554,11 @@ router.post('/dont-say-my-word/complete', auth, async (req, res) => {
 router.get('/ten-by-ten/allowance', auth, (req, res) => {
   pruneTenByTenSessions();
   return res.json(getTenByTenAllowance(req.userId));
+});
+
+router.get('/dont-say-my-word/allowance', auth, (req, res) => {
+  pruneTenByTenSessions();
+  return res.json(getDontSayMyWordAllowance(req.userId));
 });
 
 router.post('/ten-by-ten/extra-game', auth, async (req, res) => {
