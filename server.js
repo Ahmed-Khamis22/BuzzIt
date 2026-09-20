@@ -3779,7 +3779,8 @@ function normalizeArabic(text) {
       if (isHost) {
         // Host disconnected - wait for them to reconnect
         room.hostDisconnected = true;
-        io.to(code).emit('host-disconnected');
+        io.to(code).emit('host-disconnected', { hostId: room.host });
+        io.to(code).emit('host-connection-status', { hostId: room.host, online: false });
 
         // Render's free tier sleeps after 15 idle minutes and takes up to ~50s
         // to wake — a host backgrounding the app (e.g. to check WhatsApp) could
@@ -4027,7 +4028,11 @@ function normalizeArabic(text) {
         socket.emit('game-ended', room.gameSummary);
       }
 
-      io.to(code).emit('host-rejoined');
+      // Keep the legacy event for installed clients, and send a stateful
+      // companion event so current clients can reliably clear an already
+      // visible disconnect timer as soon as the host is restored.
+      io.to(code).emit('host-rejoined', { hostId: room.host });
+      io.to(code).emit('host-connection-status', { hostId: room.host, online: true });
       respond({ ok: true, code, role: 'host', status: room.status });
     }
   });
