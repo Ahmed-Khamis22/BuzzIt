@@ -105,7 +105,7 @@ async function saveGameResults(code, room) {
     socketId,
     userId: p.userId || undefined,
     username: p.name,
-    team: room.predictTeams?.[socketId] || undefined,
+    team: (room.config?.gameMode === 'codenames' ? room.codenames?.teams?.[socketId] : room.predictTeams?.[socketId]) || undefined,
     score: room.scores[socketId] || 0,
     correctAnswers: (room.correct && room.correct[socketId]) || 0,
     wrongAnswers: (room.wrong && room.wrong[socketId]) || 0,
@@ -113,7 +113,10 @@ async function saveGameResults(code, room) {
 
   let winner = null;
   let winningTeam = null;
-  if (room.config?.gameMode === 'predict') {
+  if (room.config?.gameMode === 'codenames') {
+    winningTeam = room.codenames?.winner || null;
+    winner = winningTeam ? playersData.find(player => player.team === winningTeam) : null;
+  } else if (room.config?.gameMode === 'predict') {
     const teamScores = playersData.reduce((scores, player) => {
       if (player.team) scores[player.team] = (scores[player.team] || 0) + player.score;
       return scores;
@@ -147,7 +150,7 @@ async function saveGameResults(code, room) {
     playersData
       .filter((p) => p.userId)
       .map(async (p) => {
-        const isWinner = room.config?.gameMode === 'predict'
+        const isWinner = ['predict', 'codenames'].includes(room.config?.gameMode)
           ? Boolean(winningTeam && p.team === winningTeam)
           : Boolean(winner && winner.userId && String(winner.userId) === String(p.userId));
         

@@ -138,6 +138,10 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const rooms = {};
+const codenames = require('./services/codenamesGame').createCodenamesService({
+  io, rooms, migrateHost, saveResults: saveGameResults,
+  publicUpdate: () => io.emit('public-rooms-update', getPublicRooms()),
+});
 const connectedUsers = new Map();
 const PREDICT_AI_TAKEOVER_GRACE_MS = 10_000;
 // A small beta guard keeps an unexpected public spike from slowing every
@@ -196,7 +200,7 @@ function getPublicRooms() {
       const maxPlayers = room.config?.gameMode === 'predict'
         ? getPredictMaxPlayers(room.config)
         : 8;
-      const playerCount = room.config?.gameMode === 'predict'
+      const playerCount = ['predict', 'codenames'].includes(room.config?.gameMode)
         ? Object.keys(room.players).length
         : Object.values(room.players).filter((player) => !player.disconnected).length;
       const supportsMidGameJoin = ['buzzer', 'trivia', 'draw'].includes(room.config?.gameMode || 'buzzer');
@@ -218,6 +222,7 @@ function getPublicRooms() {
 const ROOM_TIMER_KEYS = [
   'buzzTimeout', 'triviaTimer', 'drawRoundTimer', 'drawDrawerDisconnectTimer', 'predictTimer', 'afkTimer',
   'appealTimer', 'nextQuestionTimer', 'hostTimeout', 'inactivityTimeout',
+  'codenamesTimer', 'codenamesPauseTimer', 'codenamesCleanupTimer',
 ];
 
 function clearRoomTimers(room) {
@@ -423,7 +428,7 @@ function migrateHost(code) {
 
   // Predict's host is also a normal participant. Promoting them must not erase
   // their team, submitted answer, score or place in the player dock.
-  const hostKeepsPlaying = room.config?.gameMode === 'predict';
+  const hostKeepsPlaying = ['predict', 'codenames'].includes(room.config?.gameMode);
   if (!hostKeepsPlaying) {
     delete room.players[newHostId];
     delete room.scores[newHostId];
@@ -462,7 +467,8 @@ function migrateHost(code) {
   // Update public rooms list since playerCount changed
   io.emit('public-rooms-update', getPublicRooms());
 
-  if (hostKeepsPlaying) emitPredictState(code);
+  if (room.config?.gameMode === 'predict') emitPredictState(code);
+  if (room.config?.gameMode === 'codenames') codenames.sync(code);
   
   logDebug(`[Host Migration] Migration successful. New host: ${newHostPlayer.name}`);
   return true;
@@ -1673,6 +1679,15 @@ const activeSoloPlayers = {};
 const soloStats = { TenByTen: 0, DontSayMyWord: 0 };
 
 io.on('connection', (socket) => {
+  codenames.register(socket);
+  // Legacy game events must never mutate a Codenames room or bypass its rules.
+  socket.use(([event, payload], next) => {
+    const code = typeof payload === 'string' ? payload : payload?.code;
+    if (rooms[code]?.config?.gameMode === 'codenames' && ![
+      'codenames-action', 'join-room', 'rejoin-host', 'leave-room', 'kick-player',
+    ].includes(event)) return;
+    next();
+  });
   if (socket.authUserId) {
     connectedUsers.set(socket.authUserId, socket.id);
   }
@@ -1943,9 +1958,17 @@ io.on('connection', (socket) => {
       return;
     }
     const verifiedHostUserId = socket.authUserId || null;
+    if (config?.gameMode === 'codenames' && !verifiedHostUserId) {
+      socket.emit('error', 'سجّل دخولك أولًا للعب كود سري وحفظ دورك السري عند الرجوع.');
+      return;
+    }
     const verifiedHostProfile = await getVerifiedRoomProfile(verifiedHostUserId);
     const verifiedHostEquippedItems = verifiedHostProfile?.equippedItems || null;
     const normalizedConfig = { ...(config || {}) };
+    if (normalizedConfig.gameMode === 'codenames') {
+      Object.assign(normalizedConfig, { maxPlayers: 8, lifelinesEnabled: false, judgeMode: 'host',
+        timeLimit: [0, 60, 90, 120].includes(normalizedConfig.timeLimit) ? normalizedConfig.timeLimit : 90 });
+    }
     if (normalizedConfig.gameMode === 'predict') {
       normalizedConfig.judgeMode = normalizedConfig.judgeMode === 'ai' ? 'ai' : 'host';
       if (normalizedConfig.judgeMode === 'ai') {
@@ -1982,7 +2005,7 @@ io.on('connection', (socket) => {
       chessMoves: [],
     };
 
-    const isPlayingHost = config?.gameMode === 'predict' || config?.gameMode === 'trivia' || config?.gameMode === 'draw' || config?.gameMode === 'chess' || (config?.gameMode === 'buzzer' && config?.answerMode === 'written');
+    const isPlayingHost = config?.gameMode === 'codenames' || config?.gameMode === 'predict' || config?.gameMode === 'trivia' || config?.gameMode === 'draw' || config?.gameMode === 'chess' || (config?.gameMode === 'buzzer' && config?.answerMode === 'written');
     if (isPlayingHost) {
       rooms[code].players[socket.id] = {
         name: hostName || 'Unknown Host',
@@ -2003,6 +2026,7 @@ io.on('connection', (socket) => {
 
     socket.join(code);
     socket.emit('room-created', { code, hostName: rooms[code].hostName });
+    codenames.sync(code);
     
     // Immediately sync the host with the exact room state so they appear in their own lobby accurately
     const playersList = Object.entries(rooms[code].players).map(([id, p]) => ({
@@ -2078,6 +2102,10 @@ io.on('connection', (socket) => {
       return socket.emit('error', 'الروم مش موجود!');
     }
     const verifiedUserId = socket.authUserId || null;
+    if (room.config?.gameMode === 'codenames' && !verifiedUserId) {
+      respond({ ok: false, reason: 'LOGIN_REQUIRED' });
+      return socket.emit('error', 'سجّل دخولك أولًا للعب كود سري وحفظ دورك السري عند الرجوع.');
+    }
     const verifiedPlayerProfile = await getVerifiedRoomProfile(verifiedUserId);
     const verifiedEquippedItems = verifiedPlayerProfile?.equippedItems || null;
     if (verifiedUserId && room.hostUserId && String(room.hostUserId) === verifiedUserId && room.host !== socket.id) {
@@ -2116,7 +2144,7 @@ io.on('connection', (socket) => {
         : room.config?.gameMode === 'chess'
           ? 2
           : 8;
-      const occupiedSlots = room.config?.gameMode === 'predict'
+      const occupiedSlots = ['predict', 'codenames'].includes(room.config?.gameMode)
         ? Object.keys(room.players).length
         : activePlayersCount;
       if (occupiedSlots >= roomCapacity) {
@@ -2137,6 +2165,7 @@ io.on('connection', (socket) => {
         if (room.cards) room.cards[socket.id] = room.cards[reconnectingId] || { yellow: 0, red: 0 };
 
         migratePredictPlayerId(room, reconnectingId, socket.id);
+        codenames.remap(room, reconnectingId, socket.id);
 
         if (room.triviaAnswers?.[reconnectingId]) {
           room.triviaAnswers[socket.id] = room.triviaAnswers[reconnectingId];
@@ -2250,6 +2279,7 @@ io.on('connection', (socket) => {
         cards: room.cards?.[socket.id] || { yellow: 0, red: 0 }
       });
       if (room.config?.gameMode === 'predict') emitPredictState(code);
+      codenames.presence(code);
       
       // Resend current question state if playing
       if (room.status === 'PLAYING' && room.currentQuestion) {
@@ -2339,6 +2369,7 @@ io.on('connection', (socket) => {
     if (!room.cards) room.cards = {};
     room.cards[socket.id] = { yellow: 0, red: 0 };
     socket.join(code);
+    codenames.presence(code);
 
     const playersList = Object.entries(room.players).map(([id, p]) => ({
       id,
@@ -2422,6 +2453,7 @@ io.on('connection', (socket) => {
   async function handleStartGame(code, hostSocket) {
     const room = rooms[code];
     if (!room) return;
+    if (room.config?.gameMode === 'codenames') return;
     room.status = 'PLAYING';
     if (room.inactivityTimeout) {
       clearTimeout(room.inactivityTimeout);
@@ -2551,6 +2583,7 @@ io.on('connection', (socket) => {
     const code = typeof payload === 'string' ? payload : payload.code;
     const room = rooms[code];
     if (!room || room.host !== socket.id) return;
+    if (room.config?.gameMode === 'codenames') return;
     await triggerEndGame(code, typeof payload === 'object' ? payload : {});
   });
 
@@ -3232,6 +3265,14 @@ io.on('connection', (socket) => {
       return;
     }
 
+    if (room.config?.gameMode === 'codenames') {
+      if (room.status === 'PLAYING') return;
+      io.to(playerId).emit('kicked', 'تم إخراجك من الغرفة بواسطة المضيف.');
+      io.sockets.sockets.get(playerId)?.leave(code);
+      codenames.depart(code, playerId, true);
+      return;
+    }
+
     if (room.players[playerId]) {
       const name = room.players[playerId].name;
       const p = room.players[playerId];
@@ -3352,6 +3393,11 @@ io.on('connection', (socket) => {
     const respond = typeof acknowledge === 'function' ? acknowledge : () => {};
     const room = rooms[code];
     if (!room) return respond({ ok: true });
+    if (room.config?.gameMode === 'codenames') {
+      socket.leave(code);
+      codenames.depart(code, socket.id, true);
+      return respond({ ok: true });
+    }
 
     // Leaving an active two-player chess room is an authoritative resignation.
     // This lives on the server so a modified client cannot avoid the loss.
@@ -3729,6 +3775,10 @@ function normalizeArabic(text) {
       const room = rooms[code];
       const isPlayer = !!room.players[socket.id];
       const isHost = room.host === socket.id;
+      if (room.config?.gameMode === 'codenames') {
+        codenames.depart(code, socket.id, false);
+        continue;
+      }
 
       if (isPlayer) {
         // Player disconnected - don't delete, mark as disconnected
@@ -3920,6 +3970,7 @@ function normalizeArabic(text) {
         delete room.cards[participatingHostId];
 
         migratePredictPlayerId(room, participatingHostId, socket.id);
+        codenames.remap(room, participatingHostId, socket.id);
 
         io.to(code).emit('player-removed', { id: participatingHostId });
       }
@@ -4043,6 +4094,7 @@ function normalizeArabic(text) {
       // visible disconnect timer as soon as the host is restored.
       io.to(code).emit('host-rejoined', { hostId: room.host });
       io.to(code).emit('host-connection-status', { hostId: room.host, online: true });
+      codenames.presence(code);
       respond({ ok: true, code, role: 'host', status: room.status });
     }
   });
