@@ -506,12 +506,26 @@ router.post('/reset-password', verifyLimiter, async (req, res) => {
 
 router.post('/refresh', async (req, res) => {
   try {
-    const { refreshToken } = req.body || {};
-    if (!refreshToken) return res.status(401).json({ error: 'Refresh token is required' });
+    const { refreshToken, legacyAccessToken } = req.body || {};
+    let decoded;
 
-    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
-    if (decoded?.type !== 'refresh' || !decoded?.userId) {
-      return res.status(401).json({ error: 'Invalid refresh token' });
+    if (refreshToken) {
+      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+      if (decoded?.type !== 'refresh' || !decoded?.userId) {
+        return res.status(401).json({ error: 'Invalid refresh token' });
+      }
+    } else if (legacyAccessToken) {
+      // One-time migration for installations that predate refresh tokens.
+      // The old token must still be correctly signed and may be no more than
+      // 30 days past expiry; this lets an existing player keep their account.
+      decoded = jwt.verify(legacyAccessToken, process.env.JWT_SECRET, { ignoreExpiration: true });
+      const expiryMs = Number(decoded?.exp || 0) * 1000;
+      const migrationWindowMs = 30 * 24 * 60 * 60 * 1000;
+      if (!decoded?.userId || decoded?.type === 'refresh' || !expiryMs || Date.now() - expiryMs > migrationWindowMs) {
+        return res.status(401).json({ error: 'Legacy session can no longer be restored' });
+      }
+    } else {
+      return res.status(401).json({ error: 'Refresh token is required' });
     }
 
     const user = await User.findById(decoded.userId).select('_id');
