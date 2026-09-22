@@ -19,7 +19,18 @@ const router = express.Router();
 const googleClient = new OAuth2Client();
 
 function signToken(userId) {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ userId, type: 'access' }, process.env.JWT_SECRET, { expiresIn: '7d' });
+}
+
+function signRefreshToken(userId) {
+  return jwt.sign({ userId, type: 'refresh' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+}
+
+function createSession(userId) {
+  return {
+    token: signToken(userId),
+    refreshToken: signRefreshToken(userId),
+  };
 }
 
 function publicUser(userId) {
@@ -232,9 +243,8 @@ router.post('/login', loginLimiter, async (req, res) => {
       .populate('equippedItems.cover')
       .populate('equippedItems.buzzer');
 
-    const token = signToken(user._id);
     res.json({
-      token,
+      ...createSession(user._id),
       user: populatedUser,
     });
   } catch (err) {
@@ -272,7 +282,7 @@ router.post('/google', socialAuthLimiter, async (req, res) => {
       });
     }
 
-    res.json({ token: signToken(user._id), user: await publicUser(user._id) });
+    res.json({ ...createSession(user._id), user: await publicUser(user._id) });
   } catch (err) {
     console.error('[AUTH] Google sign-in failed:', err.message);
     res.status(err.status || 401).json({ error: err.status ? err.message : 'تعذر تسجيل الدخول بجوجل، حاول مرة أخرى' });
@@ -300,7 +310,7 @@ router.post('/guest', socialAuthLimiter, async (req, res) => {
       isVerified: true,
     });
 
-    res.status(201).json({ token: signToken(user._id), user: await publicUser(user._id) });
+    res.status(201).json({ ...createSession(user._id), user: await publicUser(user._id) });
   } catch (err) {
     console.error('[AUTH] Guest sign-in failed:', err.message);
     res.status(500).json({ error: 'تعذر إنشاء حساب ضيف، حاول مرة أخرى' });
@@ -389,8 +399,7 @@ router.post('/verify-email', verifyLimiter, async (req, res) => {
       .populate('equippedItems.cover')
       .populate('equippedItems.buzzer');
 
-    const token = signToken(user._id);
-    res.json({ token, user: populatedUser });
+    res.json({ ...createSession(user._id), user: populatedUser });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -492,6 +501,25 @@ router.post('/reset-password', verifyLimiter, async (req, res) => {
     res.json({ message: 'تم تغيير كلمة المرور بنجاح' });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body || {};
+    if (!refreshToken) return res.status(401).json({ error: 'Refresh token is required' });
+
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+    if (decoded?.type !== 'refresh' || !decoded?.userId) {
+      return res.status(401).json({ error: 'Invalid refresh token' });
+    }
+
+    const user = await User.findById(decoded.userId).select('_id');
+    if (!user) return res.status(401).json({ error: 'Account no longer exists' });
+
+    return res.json(createSession(user._id));
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired refresh token' });
   }
 });
 
