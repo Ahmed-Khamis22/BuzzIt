@@ -199,7 +199,9 @@ function getPublicRooms() {
     if ((room.status === 'LOBBY' || room.status === 'PLAYING') && !room.config?.isPrivate) {
       const maxPlayers = room.config?.gameMode === 'predict'
         ? getPredictMaxPlayers(room.config)
-        : 8;
+        : room.config?.gameMode === 'codenames'
+          ? ([4, 6, 8].includes(Number(room.config?.maxPlayers)) ? Number(room.config.maxPlayers) : 8)
+          : 8;
       const playerCount = ['predict', 'codenames'].includes(room.config?.gameMode)
         ? Object.keys(room.players).length
         : Object.values(room.players).filter((player) => !player.disconnected).length;
@@ -1684,7 +1686,8 @@ io.on('connection', (socket) => {
   socket.use(([event, payload], next) => {
     const code = typeof payload === 'string' ? payload : payload?.code;
     if (rooms[code]?.config?.gameMode === 'codenames' && ![
-      'codenames-action', 'join-room', 'rejoin-host', 'leave-room', 'kick-player',
+      'codenames-action', 'start-game', 'join-room', 'rejoin-host', 'leave-room',
+      'kick-player', 'update-room-config',
     ].includes(event)) return;
     next();
   });
@@ -1958,16 +1961,16 @@ io.on('connection', (socket) => {
       return;
     }
     const verifiedHostUserId = socket.authUserId || null;
-    if (config?.gameMode === 'codenames' && !verifiedHostUserId) {
-      socket.emit('error', 'سجّل دخولك أولًا للعب كود سري وحفظ دورك السري عند الرجوع.');
-      return;
-    }
     const verifiedHostProfile = await getVerifiedRoomProfile(verifiedHostUserId);
     const verifiedHostEquippedItems = verifiedHostProfile?.equippedItems || null;
     const normalizedConfig = { ...(config || {}) };
     if (normalizedConfig.gameMode === 'codenames') {
-      Object.assign(normalizedConfig, { maxPlayers: 8, lifelinesEnabled: false, judgeMode: 'host',
-        timeLimit: [0, 60, 90, 120].includes(normalizedConfig.timeLimit) ? normalizedConfig.timeLimit : 90 });
+      Object.assign(normalizedConfig, {
+        maxPlayers: [4, 6, 8].includes(Number(normalizedConfig.maxPlayers)) ? Number(normalizedConfig.maxPlayers) : 8,
+        lifelinesEnabled: false,
+        judgeMode: 'host',
+        timeLimit: [0, 60, 90, 120].includes(normalizedConfig.timeLimit) ? normalizedConfig.timeLimit : 90,
+      });
     }
     if (normalizedConfig.gameMode === 'predict') {
       normalizedConfig.judgeMode = normalizedConfig.judgeMode === 'ai' ? 'ai' : 'host';
@@ -2102,10 +2105,6 @@ io.on('connection', (socket) => {
       return socket.emit('error', 'الروم مش موجود!');
     }
     const verifiedUserId = socket.authUserId || null;
-    if (room.config?.gameMode === 'codenames' && !verifiedUserId) {
-      respond({ ok: false, reason: 'LOGIN_REQUIRED' });
-      return socket.emit('error', 'سجّل دخولك أولًا للعب كود سري وحفظ دورك السري عند الرجوع.');
-    }
     const verifiedPlayerProfile = await getVerifiedRoomProfile(verifiedUserId);
     const verifiedEquippedItems = verifiedPlayerProfile?.equippedItems || null;
     if (verifiedUserId && room.hostUserId && String(room.hostUserId) === verifiedUserId && room.host !== socket.id) {
@@ -2141,6 +2140,8 @@ io.on('connection', (socket) => {
       const activePlayersCount = Object.values(room.players).filter(p => !p.disconnected).length;
       const roomCapacity = room.config?.gameMode === 'predict'
         ? getPredictMaxPlayers(room.config)
+        : room.config?.gameMode === 'codenames'
+          ? ([4, 6, 8].includes(Number(room.config?.maxPlayers)) ? Number(room.config.maxPlayers) : 8)
         : room.config?.gameMode === 'chess'
           ? 2
           : 8;
@@ -2524,6 +2525,15 @@ io.on('connection', (socket) => {
     if (!room || room.status === 'PLAYING' || room.starting) return;
     // Only the judge starts the match — otherwise any player could force it.
     if (room.host !== socket.id) return;
+
+    if (room.config?.gameMode === 'codenames') {
+      try {
+        codenames.startFromLobby(code, socket.id, { preview: process.env.BUZZIT_ENV === 'development' || ALLOW_SOLO_TEST || process.env.NODE_ENV === 'development' });
+      } catch (error) {
+        socket.emit('error', error.message || 'تعذر بدء كود سري الآن.');
+      }
+      return;
+    }
 
     // A written Buzzer host competes and is already in room.players, so they
     // need only one joining opponent. A verbal Buzzer host is the judge and
@@ -3377,6 +3387,16 @@ io.on('connection', (socket) => {
       }
       next.maxPlayers = maxPlayers;
     }
+    if (gameMode === 'codenames' && incoming.maxPlayers !== undefined) {
+      const maxPlayers = Number(incoming.maxPlayers);
+      const activePlayers = Object.values(room.players).filter((player) => !player.disconnected).length;
+      const redPlayers = Object.values(room.codenames?.teams || {}).filter((team) => team === 'red').length;
+      const bluePlayers = Object.values(room.codenames?.teams || {}).filter((team) => team === 'blue').length;
+      if (![4, 6, 8].includes(maxPlayers) || activePlayers > maxPlayers || redPlayers > maxPlayers / 2 || bluePlayers > maxPlayers / 2) {
+        return respond({ ok: false, message: 'لا يمكن تقليل عدد اللاعبين عن توزيع الفرق الحالي.' });
+      }
+      next.maxPlayers = maxPlayers;
+    }
     if (gameMode === 'predict' && next.judgeMode === 'ai') {
       const aiStatus = await aiJudge.getStatus({ probe: true });
       if (!aiStatus.available) return respond({ ok: false, message: 'تحكيم الـAI غير متاح حاليًا.' });
@@ -3384,6 +3404,7 @@ io.on('connection', (socket) => {
 
     room.config = next;
     io.to(code).emit('room-config-updated', next);
+    if (gameMode === 'codenames') codenames.sync(code);
     io.emit('public-rooms-update', getPublicRooms());
     respond({ ok: true, config: next });
   });

@@ -24,26 +24,18 @@ function shuffle(items) {
   return result;
 }
 const other = team => team === 'red' ? 'blue' : 'red';
+const teamCapacity = room => Math.max(2, Math.floor((Number(room.config?.maxPlayers) || 8) / 2));
 const normalize = value => value.normalize('NFKC').replace(/[\u064B-\u065F\u0670\u0640]/g, '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').toLowerCase();
 
 function setup(room) {
-  if (!room.codenames) room.codenames = { phase: 'lobby', teams: {}, captains: {}, revision: 0, board: [], history: [] };
+  if (!room.codenames) room.codenames = { phase: 'lobby', teams: {}, captains: { red: null, blue: null }, revision: 0, board: [], history: [] };
   const game = room.codenames;
   for (const id of Object.keys(game.teams)) {
     if (!room.players[id]) delete game.teams[id];
   }
-  for (const id of Object.keys(room.players)) {
-    if (!game.teams[id]) {
-      const red = Object.values(game.teams).filter(t => t === 'red').length;
-      const blue = Object.values(game.teams).filter(t => t === 'blue').length;
-      game.teams[id] = red <= blue ? 'red' : 'blue';
-    }
-  }
-  if (game.phase === 'lobby') {
-    for (const team of ['red', 'blue']) {
-      if (!room.players[game.captains[team]] || game.teams[game.captains[team]] !== team) {
-        game.captains[team] = Object.keys(game.teams).find(id => game.teams[id] === team) || null;
-      }
+  for (const team of ['red', 'blue']) {
+    if (!room.players[game.captains[team]] || game.teams[game.captains[team]] !== team) {
+      game.captains[team] = null;
     }
   }
   return game;
@@ -59,11 +51,31 @@ function unavailableTeams(room) {
 }
 function ready(room) {
   const g = setup(room);
+  const redPlayers = Object.values(g.teams).filter(team => team === 'red').length;
+  const bluePlayers = Object.values(g.teams).filter(team => team === 'blue').length;
   return Object.keys(room.players).length >= 4 && unavailableTeams(room).length === 0
     && Object.values(room.players).every(p => !p.disconnected)
-    && ['red', 'blue'].every(t => Object.values(g.teams).filter(x => x === t).length >= 2);
+    && redPlayers >= 2 && bluePlayers >= 2
+    && Math.abs(redPlayers - bluePlayers) <= 1;
 }
 function remaining(g, team) { return g.board.filter(c => c.color === team && !c.revealed).length; }
+function addDevelopmentPlayers(room) {
+  const g = setup(room);
+  const hostId = room.host;
+  if (!hostId || !room.players[hostId]) return;
+  const players = [
+    [hostId, 'red', 'captain', room.players[hostId].name || 'قائد الأحمر'],
+    ['dev-red-operative', 'red', 'operative', 'مخمّن الأحمر'],
+    ['dev-blue-captain', 'blue', 'captain', 'قائد الأزرق'],
+    ['dev-blue-operative', 'blue', 'operative', 'مخمّن الأزرق'],
+  ];
+  for (const [id, team, role, name] of players) {
+    if (!room.players[id]) room.players[id] = { name, userId: null, disconnected: false, developmentOnly: true };
+    room.players[id].disconnected = false;
+    g.teams[id] = team;
+    if (role === 'captain') g.captains[team] = id;
+  }
+}
 function snapshot(room, id) {
   const g = setup(room);
   const captain = Object.values(g.captains).includes(id);
@@ -73,16 +85,20 @@ function snapshot(room, id) {
     deadline: g.deadline, pausedUntil: g.pausedUntil, winner: g.winner, reason: g.reason,
     remaining: { red: remaining(g, 'red'), blue: remaining(g, 'blue') }, captains: g.captains,
     canStart: ready(room), history: g.history.slice(-12), timeLimit: room.config.timeLimit,
+    maxPlayers: [4, 6, 8].includes(Number(room.config.maxPlayers)) ? Number(room.config.maxPlayers) : 8,
     messages: (g.messages || []).filter(m => m.team === g.teams[id]).slice(-30),
     rewardStatus: g.rewardStatus,
     rewards: { coins: g.rewards?.coinsEarnedMap?.[room.players[id]?.userId] || 0, xp: g.rewards?.xpEarnedMap?.[room.players[id]?.userId] || 0 },
-    players: Object.entries(room.players).map(([pid, p]) => ({ id: pid, name: p.name, team: g.teams[pid], disconnected: !!p.disconnected, equippedItems: p.equippedItems })),
+    players: Object.entries(room.players).map(([pid, p]) => ({ id: pid, name: p.name, team: g.teams[pid], disconnected: !!p.disconnected, developmentOnly: !!p.developmentOnly, equippedItems: p.equippedItems })),
     // Never serialize the hidden key to a guesser, even to the room owner.
     board: g.board.map((c, index) => ({ index, word: c.word, revealed: c.revealed, color: captain || c.revealed || g.phase === 'finished' ? c.color : null })),
   };
 }
-function start(room) {
-  if (!ready(room)) throw new Error('محتاجين ٤ لاعبين متصلين على الأقل: قائد ومخمّن لكل فريق.');
+function start(room, allowDevelopmentPreview = false) {
+  if (!ready(room)) {
+    if (!allowDevelopmentPreview) throw new Error('محتاجين فريقين متقاربين في العدد، وفي كل فريق قائد ومخمّن واحد على الأقل.');
+    addDevelopmentPlayers(room);
+  }
   const old = setup(room);
   const turn = randomInt(2) ? 'red' : 'blue';
   const colors = shuffle([...Array(9).fill(turn), ...Array(8).fill(other(turn)), ...Array(7).fill('neutral'), 'assassin']);
@@ -118,15 +134,26 @@ function act(room, id, event, payload = {}) {
     if (!room.players[target]) throw new Error('اللاعب مش موجود.');
     if (event === 'team') {
       if (!['red', 'blue'].includes(payload.team)) throw new Error('اختار فريقًا صحيحًا.');
-      if (Object.entries(g.teams).filter(([pid, t]) => pid !== target && t === payload.team).length >= 4) throw new Error('الفريق مكتمل: ٤ لاعبين بحد أقصى.');
-      g.teams[target] = payload.team; setup(room);
+      if (payload.role !== undefined && !['captain', 'operative'].includes(payload.role)) throw new Error('اختار دورًا صحيحًا.');
+      if (Object.entries(g.teams).filter(([pid, t]) => pid !== target && t === payload.team).length >= teamCapacity(room)) throw new Error(`الفريق مكتمل: ${teamCapacity(room)} لاعبين بحد أقصى.`);
+      const currentCaptain = g.captains[payload.team];
+      const operativeCount = Object.entries(g.teams).filter(([pid, t]) => pid !== target && t === payload.team && pid !== currentCaptain).length;
+      if (payload.role === 'operative' && operativeCount >= teamCapacity(room) - 1) throw new Error('أماكن المخمنين مكتملة، اختار قائد الكلمات.');
+      const previousTeam = g.teams[target];
+      if (previousTeam && previousTeam !== payload.team && g.captains[previousTeam] === target) g.captains[previousTeam] = null;
+      g.teams[target] = payload.team;
+      if (payload.role === 'captain') g.captains[payload.team] = target;
+      if (payload.role === 'operative' && g.captains[payload.team] === target) g.captains[payload.team] = null;
     } else {
       if (room.host !== id && target !== id) throw new Error('اختيار غير مسموح.');
-      g.captains[g.teams[target]] = target;
+      if (!g.teams[target]) throw new Error('اختار الفريق الأول قبل تحديد القائد.');
+      const team = g.teams[target];
+      g.captains[team] = g.captains[team] === target ? null : target;
     }
   } else if (event === 'start') {
     if (room.host !== id || g.phase !== 'lobby') throw new Error('المضيف يبدأ المباراة من غرفة الانتظار.');
-    start(room); return;
+    const isDevPreview = process.env.BUZZIT_ENV === 'development' || process.env.ALLOW_SOLO_TEST === 'true' || process.env.NODE_ENV === 'development';
+    start(room, isDevPreview); return;
   } else if (event === 'lobby') {
     if (room.host !== id || g.phase !== 'finished') throw new Error('انتظر نهاية المباراة.');
     room.codenames = { phase: 'lobby', teams: g.teams, captains: g.captains, revision: g.revision + 1, board: [], history: [] };
@@ -144,9 +171,9 @@ function act(room, id, event, payload = {}) {
       const n = normalize(word);
       if (g.board.some(c => !c.revealed && (normalize(c.word).includes(n) || n.includes(normalize(c.word))))) throw new Error('التلميح ما ينفعش يكون كلمة ظاهرة على اللوحة أو جزءًا منها.');
       g.clue = { word, count }; g.guessesLeft = count + 1; g.phase = 'guess';
-      g.history.push({ text: `تلميح ${g.turn === 'red' ? 'الأحمر' : 'الأزرق'}: ${word} — ${count}` });
+      g.history.push({ type: 'clue', team: g.turn, word, count, text: `تلميح ${g.turn === 'red' ? 'الأحمر' : 'الأزرق'}: ${word} — ${count}` });
     } else if (event === 'guess') {
-      if (isCaptain || g.phase !== 'guess') throw new Error('المخمّنون فقط يختارون الكلمات بعد التلميح.');
+      if (isCaptain || g.phase !== 'guess') throw new Error('انتظر تلميح قائد فريقك قبل اختيار كلمة.');
       if (!Number.isInteger(payload.index) || payload.index < 0 || payload.index >= 25) throw new Error('اختار كلمة من اللوحة.');
       const card = g.board[payload.index];
       if (card.revealed) throw new Error('الكلمة مكشوفة بالفعل.');
@@ -155,12 +182,12 @@ function act(room, id, event, payload = {}) {
         room.correct[id] = (room.correct[id] || 0) + 1;
         room.scores[id] = (room.scores[id] || 0) + 1;
       } else room.wrong[id] = (room.wrong[id] || 0) + 1;
-      g.history.push({ text: `${room.players[id].name}: ${card.word}`, color: card.color });
+      g.history.push({ type: 'guess', team: g.turn, playerName: room.players[id].name, word: card.word, color: card.color, text: `${room.players[id].name}: ${card.word}` });
       if (card.color === 'assassin') { finish(room, other(g.turn), 'تم اختيار الكلمة السوداء.'); return; }
       if (remaining(g, 'red') === 0 || remaining(g, 'blue') === 0) { finish(room, remaining(g, 'red') === 0 ? 'red' : 'blue', 'الفريق كشف كل كلماته.'); return; }
-      if (card.color !== g.turn || g.guessesLeft === 0) nextTurn(g);
+      if (card.color !== g.turn || g.guessesLeft <= 0) nextTurn(g);
     } else if (event === 'end') {
-      if (isCaptain || g.phase !== 'guess' || g.guessesLeft === g.clue.count + 1) throw new Error('اختار كلمة واحدة على الأقل قبل إنهاء الدور.');
+      if (isCaptain || g.phase !== 'guess') throw new Error('المخمّنون فقط ينهون دور التخمين.');
       nextTurn(g);
     } else throw new Error('طلب غير معروف.');
   }
@@ -172,8 +199,11 @@ function createCodenamesService({ io, rooms, migrateHost, publicUpdate, saveResu
     const room = rooms[code];
     if (room?.config?.gameMode !== 'codenames') return;
     room.code = code;
-    setup(room);
-    for (const [id, p] of Object.entries(room.players)) if (!p.disconnected) io.to(id).emit('codenames-state', snapshot(room, id));
+    const g = setup(room);
+    for (const [id, p] of Object.entries(room.players)) if (!p.disconnected) {
+      const viewerId = g.devViewers?.[id] || id;
+      io.to(id).emit('codenames-state', snapshot(room, viewerId));
+    }
   }
   function clearTimers(room) {
     clearTimeout(room.codenamesTimer); clearTimeout(room.codenamesPauseTimer); clearTimeout(room.codenamesCleanupTimer);
@@ -280,18 +310,46 @@ function createCodenamesService({ io, rooms, migrateHost, publicUpdate, saveResu
         if (!payload || typeof payload.code !== 'string') throw new Error('طلب غير صالح.');
         const room = rooms[payload.code];
         if (room?.config?.gameMode !== 'codenames' || !room.players[socket.id] || !socket.rooms.has(payload.code)) throw new Error('الغرفة غير متاحة.');
+        const developmentPreview = process.env.BUZZIT_ENV === 'development' || process.env.ALLOW_SOLO_TEST === 'true' || process.env.NODE_ENV === 'development';
+        if (developmentPreview && payload.testPlayerId) {
+          if (!room.players[payload.testPlayerId]) throw new Error('دور التجربة غير متاح.');
+          const g = setup(room);
+          g.devViewers = { ...(g.devViewers || {}), [socket.id]: payload.testPlayerId };
+        }
         if (payload.action === 'sync') { sync(payload.code); reply({ ok: true }); return; }
         const before = setup(room);
         const phase = before.phase, turn = before.turn;
         if (before.deadline && Date.now() >= before.deadline && !before.pausedUntil) throw new Error('انتهى وقت الدور، انتظر التحديث.');
-        act(room, socket.id, payload.action, payload);
+        const actingId = developmentPreview && payload.testPlayerId ? payload.testPlayerId : socket.id;
+        act(room, actingId, payload.action, payload);
         if (payload.action === 'lobby') clearTimers(room);
         schedule(payload.code, phase !== room.codenames.phase || turn !== room.codenames.turn);
         sync(payload.code); publicUpdate(); reply({ ok: true });
       } catch (e) { reply({ ok: false, message: e.message }); }
     });
   }
-  return { register, sync, presence, remap, depart };
+  function startFromLobby(code, playerId, { preview = false } = {}) {
+    const room = rooms[code];
+    if (!room || room.config?.gameMode !== 'codenames') throw new Error('الغرفة غير متاحة.');
+    if (preview) {
+      if (room.host !== playerId) throw new Error('المضيف يبدأ المباراة من غرفة الانتظار.');
+      start(room, true);
+    } else {
+      act(room, playerId, 'start');
+    }
+    const players = Object.entries(room.players).map(([id, player]) => ({
+      id,
+      name: player.name,
+      score: 0,
+      disconnected: player.disconnected,
+      equippedItems: player.equippedItems,
+    }));
+    io.to(code).emit('game-started', { players });
+    schedule(code, true);
+    sync(code);
+    publicUpdate();
+  }
+  return { register, sync, presence, remap, depart, startFromLobby };
 }
 
 module.exports = { setup, ready, start, snapshot, act, finish, remaining, unavailableTeams, createCodenamesService };
