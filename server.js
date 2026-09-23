@@ -1685,7 +1685,9 @@ io.on('connection', (socket) => {
   // Legacy game events must never mutate a Codenames room or bypass its rules.
   socket.use(([event, payload], next) => {
     const code = typeof payload === 'string' ? payload : payload?.code;
-    if (rooms[code]?.config?.gameMode === 'codenames' && ![
+    const codenamesRoom = rooms[code]?.config?.gameMode === 'codenames';
+    const codenamesLobbyChat = event === 'send-room-chat' && rooms[code]?.codenames?.phase === 'lobby';
+    if (codenamesRoom && !codenamesLobbyChat && ![
       'codenames-action', 'start-game', 'join-room', 'rejoin-host', 'leave-room',
       'kick-player', 'update-room-config',
     ].includes(event)) return;
@@ -2664,14 +2666,25 @@ io.on('connection', (socket) => {
   });
 
   // Room Chat Event
-  socket.on('send-room-chat', ({ code, text }) => {
-    if (!code || !text || typeof text !== 'string' || !text.trim()) return;
+  socket.on('send-room-chat', (payload, ack) => {
+    const reply = typeof ack === 'function' ? ack : () => {};
+    const { code, text } = payload || {};
+    if (!code || !text || typeof text !== 'string' || !text.trim()) {
+      reply({ ok: false, message: 'اكتب رسالة قبل الإرسال.' });
+      return;
+    }
     const room = rooms[code];
-    if (!room) return;
+    if (!room) {
+      reply({ ok: false, message: 'الغرفة لم تعد متاحة.' });
+      return;
+    }
 
     const player = room.players[socket.id];
     const isHost = room.host === socket.id;
-    if (!player && !isHost) return;
+    if (!player && !isHost) {
+      reply({ ok: false, message: 'لازم تكون داخل الغرفة لإرسال رسالة.' });
+      return;
+    }
 
     const senderName = player ? player.name : room.hostName;
     const equippedItems = player ? player.equippedItems : room.hostEquippedItems;
@@ -2688,6 +2701,7 @@ io.on('connection', (socket) => {
     room.chatMessages.push(msgObj);
     if (room.chatMessages.length > 100) room.chatMessages.splice(0, room.chatMessages.length - 100);
     io.to(code).emit('room-chat-received', msgObj);
+    reply({ ok: true, messageId: msgObj.id });
   });
 
   // Room Voice Chat (Microphone Audio) Event
