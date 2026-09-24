@@ -50,7 +50,22 @@ const syncQuestionCorrections = require('./services/questionCorrectionSync');
 const syncSoloGameQuestions = require('./services/soloQuestionSync');
 
 connectDB()
-  .then(() => Promise.all([syncFlagQuestions(), syncQuestionCorrections(), syncSoloGameQuestions()]))
+  .then(async () => {
+    const adminBootstrapEmail = (process.env.ADMIN_BOOTSTRAP_EMAIL || '').trim().toLowerCase();
+    if (adminBootstrapEmail) {
+      try {
+        const promotedUser = await User.findOneAndUpdate(
+          { email: adminBootstrapEmail },
+          { $set: { isAdmin: true } },
+          { new: true }
+        ).select('_id').lean();
+        console.log(`[AdminBootstrap] ${promotedUser ? 'matching account promoted' : 'no matching account found'}`);
+      } catch (error) {
+        console.error('[AdminBootstrap] promotion failed:', error.message);
+      }
+    }
+    return Promise.all([syncFlagQuestions(), syncQuestionCorrections(), syncSoloGameQuestions()]);
+  })
   .catch((error) => console.error('Question sync failed:', error.message));
 
 const app = express();
