@@ -2204,7 +2204,6 @@ io.on('connection', (socket) => {
         delete room.wrong[reconnectingId];
         delete room.cards[reconnectingId];
         
-        io.to(code).emit('player-removed', { id: reconnectingId });
       }
 
       room.players[socket.id].disconnected = false;
@@ -2276,6 +2275,7 @@ io.on('connection', (socket) => {
       respond({ ok: true, code, role: room.host === socket.id ? 'host' : 'player', status: room.status });
       io.to(code).emit('player-rejoined', {
         id: socket.id,
+        previousId: reconnectingId !== socket.id ? reconnectingId : null,
         name: playerName,
         userId: verifiedUserId,
         score: room.scores[socket.id],
@@ -3823,7 +3823,9 @@ function normalizeArabic(text) {
         // Player disconnected - don't delete, mark as disconnected
         room.players[socket.id].disconnected = true;
         const name = room.players[socket.id].name;
-        io.to(room.host).emit('player-left', { id: socket.id, name });
+        // Every player needs the presence update so all game views can keep
+        // the seat visible and mark it as away.
+        io.to(code).emit('player-left', { id: socket.id, name });
         if (room.status === 'LOBBY') publicRoomsChanged = true;
 
         if (room.buzzer === socket.id) {
@@ -3881,11 +3883,8 @@ function normalizeArabic(text) {
         io.to(code).emit('host-disconnected', { hostId: room.host });
         io.to(code).emit('host-connection-status', { hostId: room.host, online: false });
 
-        // Render's free tier sleeps after 15 idle minutes and takes up to ~50s
-        // to wake — a host backgrounding the app (e.g. to check WhatsApp) could
-        // hit that cold start on the way back. 20s used to expire the room
-        // before reconnection even finished; 75s comfortably outlasts the
-        // worst-case wake time plus the socket handshake after it.
+        // Give the host a short window to return from a background app, then
+        // migrate the room instead of leaving everyone waiting over a minute.
         room.hostTimeout = setTimeout(() => {
           if (rooms[code] && rooms[code].hostDisconnected) {
             const migrated = migrateHost(code);
@@ -3903,7 +3902,7 @@ function normalizeArabic(text) {
             }
             io.emit('public-rooms-update', getPublicRooms());
           }
-        }, 75000); // 75 seconds
+        }, 30000); // 30 seconds
 
         publicRoomsChanged = true;
       }
@@ -4011,7 +4010,6 @@ function normalizeArabic(text) {
         migratePredictPlayerId(room, participatingHostId, socket.id);
         codenames.remap(room, participatingHostId, socket.id);
 
-        io.to(code).emit('player-removed', { id: participatingHostId });
       }
 
       room.host = socket.id;
@@ -4073,6 +4071,7 @@ function normalizeArabic(text) {
       if (room.players[socket.id]) {
         io.to(code).emit('player-rejoined', {
           id: socket.id,
+          previousId: participatingHostId && participatingHostId !== socket.id ? participatingHostId : null,
           name: room.players[socket.id].name,
           userId: room.players[socket.id].userId || null,
           score: room.scores[socket.id] || 0,
