@@ -502,6 +502,9 @@
       <button class="nav-btn" onclick="switchTab('questions', this)">
         <i data-lucide="help-circle"></i> مكتبة وإضافة الأسئلة
       </button>
+      <button class="nav-btn" onclick="switchTab('question-review', this)">
+        <i data-lucide="clipboard-check"></i> مراجعة أسئلة اللاعبين
+      </button>
       <button class="nav-btn" onclick="switchTab('ai', this)">
         <i data-lucide="bot"></i> مراقبة الذكاء الاصطناعي
       </button>
@@ -933,6 +936,37 @@
           </div>
         </div>
       </div>
+
+      <!-- PLAYER QUESTION SUGGESTIONS REVIEW -->
+      <div id="tab-question-review" class="section-view">
+        <div class="page-title-row" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h1 class="page-title">مراجعة أسئلة اللاعبين</h1>
+            <p class="page-desc">راجع الاقتراحات قبل إضافتها للعبة. اعتماد السؤال يضيف لصاحبه 50 كوينز و20 XP.</p>
+          </div>
+          <button class="btn btn-primary" onclick="loadSuggestedQuestions()">
+            <i data-lucide="refresh-cw" style="width: 16px; height: 16px;"></i> تحديث القائمة
+          </button>
+        </div>
+        <div class="content-card">
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>السؤال والإجابات</th>
+                  <th>القسم والصعوبة</th>
+                  <th>مقدّم السؤال</th>
+                  <th>تاريخ الإرسال</th>
+                  <th>المراجعة</th>
+                </tr>
+              </thead>
+              <tbody id="suggestedQuestionsTableBody">
+                <tr><td colspan="5" style="text-align: center; color: var(--ink-muted);">اضغط تحديث القائمة لعرض الأسئلة المعلّقة</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -1137,6 +1171,7 @@
       if (tabId === 'reports') loadReportedQuestions();
       if (tabId === 'feedbacks') loadFeedbacks();
       if (tabId === 'questions') loadQuestions();
+      if (tabId === 'question-review') loadSuggestedQuestions();
       if (tabId === 'store') loadStoreItems();
       if (tabId === 'purchases') loadPurchases();
       if (tabId === 'operations') loadAppSettings();
@@ -1879,6 +1914,78 @@
         alert(data.message || 'تم حذف الشكوى بنجاح!');
         loadFeedbacks();
       });
+    }
+
+    /* PLAYER QUESTION SUGGESTION REVIEW */
+    function loadSuggestedQuestions() {
+      const tbody = document.getElementById('suggestedQuestionsTableBody');
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--ink-muted);">جاري تحميل الأسئلة المعلّقة...</td></tr>';
+      fetch('/api/questions/pending', {
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'تعذر تحميل الأسئلة المعلّقة.');
+        renderSuggestedQuestions(Array.isArray(data) ? data : []);
+      })
+      .catch((error) => {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--accent-rose);">${escapeHtml(error.message)}</td></tr>`;
+      });
+    }
+
+    function renderSuggestedQuestions(list) {
+      const tbody = document.getElementById('suggestedQuestionsTableBody');
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--ink-muted);">مفيش أسئلة جديدة مستنية المراجعة.</td></tr>';
+        return;
+      }
+      const categories = {
+        'reversed-words': 'كلمات معكوسة', 'general-knowledge': 'معلومات عامة',
+        'describe-it': 'اشرحها وتحدّى', flags: 'أعلام وأجوبة',
+        'word-in-song': 'كلمة في أغنية', 'egyptian-movies': 'أفلام مصرية',
+        'predict-questions': 'توقّع ووقّع', 'dont-say-my-word': 'ممنوع تقول الكلمة'
+      };
+      const difficulties = { easy: 'سهل', medium: 'متوسط', hard: 'صعب' };
+      tbody.innerHTML = list.map((q) => {
+        const choices = Array.isArray(q.choices) && q.choices.length
+          ? `<div style="margin-top:6px;color:var(--ink-muted);font-size:12px;">الاختيارات: ${q.choices.map(escapeHtml).join(' · ')}</div>`
+          : '';
+        const submittedBy = q.submittedBy?.username || 'لاعب';
+        const createdAt = q.createdAt ? new Date(q.createdAt).toLocaleString('ar-EG') : '—';
+        return `<tr>
+          <td style="min-width:260px;max-width:440px;white-space:normal;line-height:1.7;">
+            <strong>${escapeHtml(q.text)}</strong>
+            <div style="margin-top:6px;color:var(--accent-emerald);">الإجابة: ${escapeHtml(q.answer)}</div>
+            ${choices}
+          </td>
+          <td>${escapeHtml(categories[q.category] || q.category || '—')}<div style="margin-top:6px;color:var(--ink-muted);font-size:12px;">${escapeHtml(difficulties[q.difficulty] || q.difficulty || 'متوسط')}</div></td>
+          <td>${escapeHtml(submittedBy)}</td>
+          <td style="white-space:nowrap;">${escapeHtml(createdAt)}</td>
+          <td><div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-success" style="padding:5px 10px;font-size:12px;" onclick="reviewSuggestedQuestion('${q._id}','approve')">اعتماد + مكافأة</button>
+            <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="reviewSuggestedQuestion('${q._id}','reject')">رفض</button>
+          </div></td>
+        </tr>`;
+      }).join('');
+    }
+
+    function reviewSuggestedQuestion(id, decision) {
+      const isApprove = decision === 'approve';
+      const confirmation = isApprove
+        ? 'تعتمد السؤال؟ هيتضاف لصاحبه 50 كوينز و20 XP.'
+        : 'ترفض السؤال؟ مش هيظهر في اللعبة ومش هتتصرف مكافأة.';
+      if (!confirm(confirmation)) return;
+      fetch(`/api/questions/${id}/${decision}`, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'تعذر حفظ قرار المراجعة.');
+        alert(data.message || 'تم تحديث حالة السؤال.');
+        loadSuggestedQuestions();
+      })
+      .catch((error) => alert(error.message));
     }
 
     /* ❓ QUESTIONS LIBRARY HANDLERS */
