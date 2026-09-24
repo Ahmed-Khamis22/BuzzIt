@@ -11,13 +11,18 @@ const router = express.Router();
 //
 //   https://buzzit-6l4o.onrender.com/api/ads/ssv
 //
-// Always answer 200. Google retries non-2xx, and retrying won't fix a bad
-// signature or an unknown user — it just fills the log with noise.
+// Answer 200 for permanent rejection (bad signature or unknown user), and
+// 503 for transient verifier-key or storage failures so Google can retry.
 router.get('/ssv', async (req, res) => {
   try {
     const result = await verifySsvRequest(req.originalUrl);
     if (!result.ok) {
       console.warn('[AdSSV] rejected callback:', result.reason);
+      // Google retries non-2xx responses. A temporary key-server failure must
+      // be retried, otherwise a genuine view can never be claimed.
+      if (result.reason.startsWith('key fetch:') || result.reason.startsWith('key refetch:')) {
+        return res.sendStatus(503);
+      }
       return res.sendStatus(200);
     }
 
@@ -62,7 +67,7 @@ router.get('/ssv', async (req, res) => {
     res.sendStatus(200);
   } catch (err) {
     console.error('[AdSSV] callback handler failed:', err);
-    res.sendStatus(200);
+    res.sendStatus(503);
   }
 });
 

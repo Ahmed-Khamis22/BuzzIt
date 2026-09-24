@@ -4,9 +4,10 @@ const crypto = require('crypto');
 //
 // Google signs each rewarded-ad callback with one of the ECDSA keys published
 // below and appends `signature` and `key_id` as the last two query parameters.
-// The signed content is the raw query string up to (not including) `&signature=`,
-// so we must read it off the original URL — re-serialising a parsed object
-// reorders and re-encodes parameters and the signature stops matching.
+// The signed content is the query string up to (not including) `&signature=`.
+// Google's reference verifier uses URI.getQuery(), which percent-decodes the
+// query while retaining parameter order. Re-serialising parsed parameters
+// changes the signed content, especially when custom_data is present.
 const VERIFIER_KEYS_URL = 'https://www.gstatic.com/admob/reward/verifier-keys.json';
 
 let keyCache = { keys: null, fetchedAt: 0 };
@@ -43,7 +44,14 @@ async function verifySsvRequest(originalUrl) {
   // order. Everything before them is what was signed.
   const sigIndex = query.indexOf('&signature=');
   if (sigIndex === -1) return { ok: false, reason: 'no signature parameter' };
-  const signedContent = query.slice(0, sigIndex);
+  let signedContent;
+  try {
+    // Match Java URI.getQuery(): decode percent escapes but do not turn `+`
+    // into a space or reorder parameters. custom_data is URL-escaped by AdMob.
+    signedContent = decodeURIComponent(query.slice(0, sigIndex));
+  } catch {
+    return { ok: false, reason: 'invalid query encoding' };
+  }
 
   const params = new URLSearchParams(query);
   const signature = params.get('signature');
