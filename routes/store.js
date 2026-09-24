@@ -119,7 +119,12 @@ router.get('/items', async (req, res) => {
     query.isAdminOnly = { $ne: true };
 
     const items = await StoreItem.find(query).lean();
-    const visibleItems = items.filter((item) => item.type !== 'avatar' || item.isAdminOnly || PLAYER_AVATAR_KEYS.has(item.imageUrl));
+    const helpCardKeys = new Set(HELP_CARDS.map((card) => card.consumableKey));
+    const helpCardImages = new Set(HELP_CARDS.map((card) => card.imageUrl));
+    const visibleItems = items.filter((item) =>
+      (item.type !== 'card' || (!helpCardKeys.has(item.consumableKey) && !helpCardImages.has(item.imageUrl))) &&
+      (item.type !== 'avatar' || item.isAdminOnly || PLAYER_AVATAR_KEYS.has(item.imageUrl))
+    );
     res.json([...HELP_CARDS, ...visibleItems]);
   } catch (err) {
     res.status(500).json({ error: err.message });
