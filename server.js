@@ -2739,15 +2739,16 @@ io.on('connection', (socket) => {
   });
 
   // Submit Buzzer Answer Event (Remote/Written Play)
-  socket.on('submit-buzzer-answer', ({ code, answer }) => {
-    if (!code || !answer) return;
+  socket.on('submit-buzzer-answer', (payload = {}) => {
+    const { code, answer } = payload && typeof payload === 'object' ? payload : {};
+    if (typeof code !== 'string' || typeof answer !== 'string' || answer.length > 200) return;
     const room = rooms[code];
     if (!room || room.status !== 'PLAYING') return;
 
     if (room.buzzer !== socket.id) return;
 
     const trimmedAnswer = answer.trim();
-    if (!trimmedAnswer || trimmedAnswer.length > 200) return;
+    if (!trimmedAnswer) return;
     room.buzzedAnswer = trimmedAnswer;
 
     // Broadcast to everyone so host sees the written answer
@@ -3121,7 +3122,11 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('submit-trivia-answer', ({ code, answer }) => {
+  socket.on('submit-trivia-answer', (payload = {}) => {
+    const { code, answer } = payload && typeof payload === 'object' ? payload : {};
+    if (typeof code !== 'string' || typeof answer !== 'string' || answer.length > 200) return;
+    const trimmedAnswer = answer.trim();
+    if (!trimmedAnswer) return;
     const room = rooms[code];
     if (!room || room.status !== 'PLAYING' || room.config?.gameMode !== 'trivia') return;
     if (!room.currentQuestion || room.evaluatingTrivia || room.answerRevealed) return;
@@ -3133,7 +3138,7 @@ io.on('connection', (socket) => {
 
     // Record the answer and time
     room.triviaAnswers[socket.id] = {
-      answer,
+      answer: trimmedAnswer,
       time: Date.now(),
       usedDouble: room.lifelines && room.lifelines[socket.id] === 'double',
       usedShield: room.lifelines && room.lifelines[socket.id] === 'shield',
@@ -3717,28 +3722,29 @@ function normalizeArabic(text) {
   return str;
 }
 
-  socket.on('draw-guess', (data, acknowledge = () => {}) => {
-    const { code, guess } = data;
+  socket.on('draw-guess', (data, acknowledge) => {
+    const reply = typeof acknowledge === 'function' ? acknowledge : () => {};
+    const { code, guess } = data && typeof data === 'object' ? data : {};
     const playerId = socket.id;
+    if (typeof code !== 'string' || typeof guess !== 'string' || guess.length > 120) {
+      return reply({ accepted: false, message: 'صيغة التخمين غير صحيحة.' });
+    }
     const room = rooms[code];
     if (!room || room.status !== 'PLAYING' || room.config.gameMode !== 'draw') {
-      return acknowledge({ accepted: false, message: 'الجولة مش متاحة دلوقتي.' });
+      return reply({ accepted: false, message: 'الجولة مش متاحة دلوقتي.' });
     }
     if (!room.currentDrawWord || room.drawRoundEnded || (room.drawRoundTimer === null && room.drawRoundNumber > 0 && room.drawRoundEndData)) {
-      return acknowledge({ accepted: false, message: 'الجولة انتهت.' });
+      return reply({ accepted: false, message: 'الجولة انتهت.' });
     }
     if (!room.correctGuessers) room.correctGuessers = new Set();
 
     // Drawer can't guess, already-correct players can't spam
-    if (socket.id === room.drawerId) return acknowledge({ accepted: false, message: 'الرسام ما ينفعش يخمّن.' });
-    if (room.correctGuessers.has(playerId)) return acknowledge({ accepted: false, message: 'إنت خمّنت الكلمة صح بالفعل.' });
+    if (socket.id === room.drawerId) return reply({ accepted: false, message: 'الرسام ما ينفعش يخمّن.' });
+    if (room.correctGuessers.has(playerId)) return reply({ accepted: false, message: 'إنت خمّنت الكلمة صح بالفعل.' });
     // Only actual competitors score, otherwise a spectator creates a phantom entry
-    if (!room.players[playerId] || room.players[playerId].disconnected) return acknowledge({ accepted: false, message: 'الاتصال بالغرفة لسه بيرجع.' });
+    if (!room.players[playerId] || room.players[playerId].disconnected) return reply({ accepted: false, message: 'الاتصال بالغرفة لسه بيرجع.' });
     if (typeof guess !== 'string' || !guess.trim()) {
-      return acknowledge({ accepted: false, message: 'اكتب تخمين الأول.' });
-    }
-    if (guess.length > 120) {
-      return acknowledge({ accepted: false, message: 'التخمين طويل زيادة.' });
+      return reply({ accepted: false, message: 'اكتب تخمين الأول.' });
     }
 
     // Same forgiving comparison the buzzer mode uses, so a typo doesn't cost the
@@ -3787,12 +3793,12 @@ function normalizeArabic(text) {
       if (allGuessed) {
         endDrawRound(code);
       }
-      acknowledge({ accepted: true, correct: true });
+      reply({ accepted: true, correct: true });
     } else {
       // Wrong guess → broadcast as normal chat
       room.wrong[playerId] = (room.wrong[playerId] || 0) + 1;
       io.to(code).emit('draw-chat', { playerId, guess });
-      acknowledge({ accepted: true, correct: false });
+      reply({ accepted: true, correct: false });
     }
   });
 
