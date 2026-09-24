@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const StoreItem = require('../models/StoreItem');
 const User = require('../models/User');
 const Coupon = require('../models/Coupon');
@@ -47,6 +48,10 @@ const PLAYER_BORDERS = [
 ];
 const GAME_BUZZERS = [
   { name: 'جرس الطلب', description: 'جرس جديد تستخدمه في تحدي الجرس.', price: 3000, type: 'buzzer', imageUrl: 'bell_restaurant_v1', isAvailable: true },
+  { name: 'جرس أركيد نيون', description: 'زر ألعاب نيون بصوت إلكتروني سريع.', price: 3500, type: 'buzzer', imageUrl: 'bell_arcade_neon_v1', isAvailable: true },
+  { name: 'الجرس النحاسي', description: 'جرس مكتب كلاسيكي برنّة نحاسية.', price: 2500, type: 'buzzer', imageUrl: 'bell_brass_v1', isAvailable: true },
+  { name: 'جرس الصاروخ', description: 'زر انطلاق بصوت صاروخي مميز.', price: 4000, type: 'buzzer', imageUrl: 'bell_rocket_v1', isAvailable: true },
+  { name: 'جرس المجرة', description: 'جرس كوني برنّة فضائية لامعة.', price: 4500, type: 'buzzer', imageUrl: 'bell_cosmic_v1', isAvailable: true },
 ];
 const LEGACY_SQUARE_BORDER_KEYS = [
   'border_fire',
@@ -128,7 +133,27 @@ router.post('/buy', auth, async (req, res) => {
     if (!['coins', 'gems'].includes(currency)) return res.status(400).json({ error: 'Invalid currency' });
 
     const helpCard = HELP_CARDS.find((card) => card._id === itemId);
-    const item = helpCard || await StoreItem.findById(itemId);
+    let item = helpCard || null;
+    if (!item && mongoose.isValidObjectId(itemId)) {
+      item = await StoreItem.findById(itemId);
+    } else if (!item) {
+      const fallbackBuzzerAssets = {
+        buzzer_restaurant_01: 'bell_restaurant_v1',
+        buzzer_arcade_neon_01: 'bell_arcade_neon_v1',
+        buzzer_brass_01: 'bell_brass_v1',
+        buzzer_rocket_01: 'bell_rocket_v1',
+        buzzer_cosmic_01: 'bell_cosmic_v1',
+      };
+      const imageUrl = fallbackBuzzerAssets[itemId];
+      const fallbackBuzzer = GAME_BUZZERS.find((buzzer) => buzzer.imageUrl === imageUrl);
+      if (fallbackBuzzer) {
+        item = await StoreItem.findOneAndUpdate(
+          { imageUrl, type: 'buzzer' },
+          { $setOnInsert: fallbackBuzzer },
+          { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+      }
+    }
     if (!item || !item.isAvailable) {
       return res.status(404).json({ error: 'Item not found' });
     }
