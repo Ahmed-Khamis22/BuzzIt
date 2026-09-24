@@ -403,7 +403,7 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
         { _id: req.userId, adCurrencyRewardDay: today, [claimedPath]: { $gt: 0 } },
         { $inc: { [claimedPath]: -1 } },
       );
-      return res.status(402).json({ error: view.error });
+      return res.status(402).json({ error: view.error, code: view.code });
     }
 
     user[reward.field] += reward.amount;
