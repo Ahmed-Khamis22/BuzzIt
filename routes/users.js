@@ -378,7 +378,14 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
       {
         _id: req.userId,
         adCurrencyRewardDay: today,
-        [claimedPath]: { $lt: AD_CURRENCY_REWARD_DAILY_LIMIT },
+        // On a new day the counter map is reset to `{}`, so this nested path
+        // does not exist yet. MongoDB's `$lt` does not match a missing field;
+        // without the `$exists` branch a user's first ad of the day was
+        // incorrectly rejected as if they'd already used all three.
+        $or: [
+          { [claimedPath]: { $lt: AD_CURRENCY_REWARD_DAILY_LIMIT } },
+          { [claimedPath]: { $exists: false } },
+        ],
       },
       { $inc: { [claimedPath]: 1 } },
       { new: true },
