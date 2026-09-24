@@ -1203,7 +1203,11 @@ async function getVerifiedRoomProfile(userId) {
 
 async function buildMatchStage(room) {
   const categories = room.config?.categories || [];
-  const matchStage = {};
+  const matchStage = {
+    // User suggestions stay out of live games until an admin approves them.
+    // Missing status keeps older curated questions playable.
+    $or: [{ status: 'approved' }, { status: { $exists: false } }],
+  };
 
   if (room.config?.gameMode === 'trivia' && room.config?.difficulty && room.config.difficulty !== 'mixed') {
     matchStage.difficulty = room.config.difficulty;

@@ -28,10 +28,13 @@ const questionSchema = new mongoose.Schema({
   // Stable identity for curated game-bank records; absent on admin-authored questions.
   bankKey: { type: String, default: null },
   bankVersion: { type: Number, default: null },
+  // UGC Support
+  status: { type: String, enum: ['approved', 'pending', 'rejected'], default: 'approved' },
+  submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 });
 
 // Supports the filters used when selecting the next round question.
-questionSchema.index({ isCustomTrivia: 1, category: 1, difficulty: 1, judgeEvaluated: 1, _id: 1 });
+questionSchema.index({ status: 1, isCustomTrivia: 1, category: 1, difficulty: 1, judgeEvaluated: 1, _id: 1 });
 questionSchema.index({ category: 1, bankKey: 1 });
 
 module.exports = mongoose.model('Question', questionSchema);
