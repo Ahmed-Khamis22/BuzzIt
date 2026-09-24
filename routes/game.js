@@ -26,9 +26,11 @@ router.post('/save', auth, async (req, res) => {
   }
 });
 
-router.get('/history/:userId', async (req, res) => {
+router.get('/history/:userId', auth, async (req, res) => {
   try {
-    const { userId } = req.params;
+    // Keep the URL parameter for existing clients, but always scope access to
+    // the authenticated account so callers cannot query another user's data.
+    const userId = req.userId;
     const requestedLimit = Number.parseInt(req.query.limit, 10);
     const limit = Number.isFinite(requestedLimit)
       ? Math.min(Math.max(requestedLimit, 1), 100)
