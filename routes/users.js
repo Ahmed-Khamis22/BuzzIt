@@ -699,7 +699,7 @@ router.get('/season-rank/:id', auth, async (req, res) => {
 router.get('/profile/:id', auth, async (req, res) => {
   try {
     const targetUser = await User.findById(req.params.id)
-      .select('username bio totalWins totalGames totalCorrect totalWrong xp level equippedItems createdAt preferences.showStats')
+      .select('username bio totalWins totalGames totalCorrect totalWrong xp level isAdmin equippedItems createdAt preferences.showStats')
       .populate('equippedItems.avatar')
       .populate('equippedItems.border')
       .populate('equippedItems.cover')
@@ -742,7 +742,7 @@ router.get('/me/friends', auth, async (req, res) => {
     const user = await User.findById(req.userId)
       .populate({
         path: 'friends',
-        select: 'username bio equippedItems totalWins totalGames totalCorrect xp level preferences',
+        select: 'username bio isAdmin equippedItems totalWins totalGames totalCorrect xp level preferences',
         populate: [
           { path: 'equippedItems.avatar', select: 'name imageUrl price type' },
           { path: 'equippedItems.border', select: 'name imageUrl price type' },
@@ -751,7 +751,7 @@ router.get('/me/friends', auth, async (req, res) => {
       })
       .populate({
         path: 'friendRequestsReceived',
-        select: 'username bio equippedItems totalWins totalGames totalCorrect xp level preferences',
+        select: 'username bio isAdmin equippedItems totalWins totalGames totalCorrect xp level preferences',
         populate: [
           { path: 'equippedItems.avatar', select: 'name imageUrl price type' },
           { path: 'equippedItems.border', select: 'name imageUrl price type' },
@@ -760,7 +760,7 @@ router.get('/me/friends', auth, async (req, res) => {
       })
       .populate({
         path: 'friendRequestsSent',
-        select: 'username bio equippedItems totalWins totalGames totalCorrect xp level preferences',
+        select: 'username bio isAdmin equippedItems totalWins totalGames totalCorrect xp level preferences',
         populate: [
           { path: 'equippedItems.avatar', select: 'name imageUrl price type' },
           { path: 'equippedItems.border', select: 'name imageUrl price type' },
@@ -798,7 +798,7 @@ router.get('/search', auth, async (req, res) => {
       username: { $regex: escapedQuery, $options: 'i' },
       _id: { $ne: currentUserId }
     })
-    .select('username bio equippedItems totalWins totalGames xp level')
+    .select('username bio isAdmin equippedItems totalWins totalGames xp level')
     .populate([
       { path: 'equippedItems.avatar', select: 'name imageUrl price type' },
       { path: 'equippedItems.border', select: 'name imageUrl price type' },

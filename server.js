@@ -426,6 +426,8 @@ function migrateHost(code) {
   room.host = newHostId;
   room.hostName = newHostPlayer.name;
   room.hostUserId = newHostPlayer.userId || null;
+  room.hostEquippedItems = newHostPlayer.equippedItems || null;
+  room.hostIsAdmin = Boolean(newHostPlayer.isAdmin);
   room.hostDisconnected = false;
 
   // Predict's host is also a normal participant. Promoting them must not erase
@@ -513,7 +515,8 @@ function rotateHost(code) {
     name: room.hostName,
     userId: room.hostUserId,
     disconnected: !!room.hostDisconnected,
-    equippedItems: room.hostEquippedItems || null
+    equippedItems: room.hostEquippedItems || null,
+    isAdmin: Boolean(room.hostIsAdmin)
   };
   room.scores[oldHostId] = oldHostStats.score;
   room.correct[oldHostId] = oldHostStats.correct;
@@ -534,6 +537,7 @@ function rotateHost(code) {
   room.hostName = newHostPlayer.name;
   room.hostUserId = newHostPlayer.userId || null;
   room.hostEquippedItems = newHostPlayer.equippedItems || null;
+  room.hostIsAdmin = Boolean(newHostPlayer.isAdmin);
 
   // Remove new host from players structures
   delete room.players[newHostId];
@@ -567,6 +571,7 @@ function rotateHost(code) {
     userId: room.players[oldHostId].userId,
     score: oldHostStats.score,
     equippedItems: room.players[oldHostId].equippedItems,
+    isAdmin: Boolean(room.players[oldHostId].isAdmin),
     cards: oldHostStats.cards
   });
 
@@ -703,6 +708,7 @@ function movePredictSeatToAi(code, playerId) {
     userId: player.userId || null,
     score: room.scores[aiPlayerId],
     equippedItems: player.equippedItems || null,
+    isAdmin: Boolean(player.isAdmin),
     cards: room.cards[aiPlayerId],
     team: room.predictTeams?.[aiPlayerId] || null,
     aiControlled: true,
@@ -1171,6 +1177,7 @@ function judgeInfo(room) {
     name: room.hostName,
     userId: room.hostUserId || null,
     equippedItems: room.hostEquippedItems || null,
+    isAdmin: Boolean(room.hostIsAdmin),
   };
 }
 
@@ -1181,7 +1188,7 @@ async function getVerifiedRoomProfile(userId) {
   if (!userId) return null;
   try {
     const account = await User.findById(userId)
-      .select('equippedItems xp level')
+      .select('equippedItems xp level isAdmin')
       .populate('equippedItems.avatar')
       .populate('equippedItems.theme')
       .populate('equippedItems.effect')
@@ -1194,6 +1201,7 @@ async function getVerifiedRoomProfile(userId) {
       equippedItems: account.equippedItems || null,
       xp: Math.max(0, Number(account.xp) || 0),
       level: Math.max(1, Number(account.level) || 1),
+      isAdmin: Boolean(account.isAdmin),
     };
   } catch (error) {
     console.warn('[rooms] failed to verify equipped items:', error?.message);
@@ -1994,6 +2002,7 @@ io.on('connection', (socket) => {
       hostName: hostName || 'Unknown Host',
       hostUserId: verifiedHostUserId,
       hostEquippedItems: verifiedHostEquippedItems,
+      hostIsAdmin: Boolean(verifiedHostProfile?.isAdmin),
       status: 'LOBBY', // LOBBY, PLAYING, RESULTS
       config: normalizedConfig,
       players: {},
@@ -2021,6 +2030,7 @@ io.on('connection', (socket) => {
         userId: verifiedHostUserId,
         disconnected: false,
         equippedItems: verifiedHostEquippedItems,
+        isAdmin: Boolean(verifiedHostProfile?.isAdmin),
         xp: verifiedHostProfile?.xp || 0,
         level: verifiedHostProfile?.level || 1,
       };
@@ -2047,6 +2057,7 @@ io.on('connection', (socket) => {
       wrongAnswers: rooms[code].wrong[id] || 0,
       disconnected: p.disconnected,
       equippedItems: p.equippedItems,
+      isAdmin: Boolean(p.isAdmin),
       xp: p.xp || 0,
       level: p.level || 1,
       team: p.team,
@@ -2210,6 +2221,7 @@ io.on('connection', (socket) => {
       room.players[socket.id].aiControlled = false;
       room.players[socket.id].name = playerName; // Update name just in case
       room.players[socket.id].equippedItems = verifiedEquippedItems;
+      room.players[socket.id].isAdmin = Boolean(verifiedPlayerProfile?.isAdmin);
       room.players[socket.id].xp = verifiedPlayerProfile?.xp || 0;
       room.players[socket.id].level = verifiedPlayerProfile?.level || 1;
 
@@ -2265,6 +2277,7 @@ io.on('connection', (socket) => {
         wrongAnswers: room.wrong[id] || 0,
         disconnected: p.disconnected,
         equippedItems: p.equippedItems,
+        isAdmin: Boolean(p.isAdmin),
         xp: p.xp || 0,
         level: p.level || 1,
         team: room.predictTeams?.[id] || null,
@@ -2280,6 +2293,7 @@ io.on('connection', (socket) => {
         userId: verifiedUserId,
         score: room.scores[socket.id],
         equippedItems: room.players[socket.id].equippedItems,
+        isAdmin: Boolean(room.players[socket.id].isAdmin),
         xp: room.players[socket.id].xp || 0,
         level: room.players[socket.id].level || 1,
         team: room.predictTeams?.[socket.id] || null,
@@ -2367,6 +2381,7 @@ io.on('connection', (socket) => {
       userId: verifiedUserId,
       disconnected: false,
       equippedItems: verifiedEquippedItems,
+      isAdmin: Boolean(verifiedPlayerProfile?.isAdmin),
       xp: verifiedPlayerProfile?.xp || 0,
       level: verifiedPlayerProfile?.level || 1,
     };
@@ -2387,6 +2402,7 @@ io.on('connection', (socket) => {
       wrongAnswers: room.wrong[id] || 0,
       disconnected: p.disconnected,
       equippedItems: p.equippedItems,
+      isAdmin: Boolean(p.isAdmin),
       xp: p.xp || 0,
       level: p.level || 1,
       team: p.team,
@@ -2401,6 +2417,7 @@ io.on('connection', (socket) => {
       userId: verifiedUserId,
       score: 0,
       equippedItems: verifiedEquippedItems,
+      isAdmin: Boolean(verifiedPlayerProfile?.isAdmin),
       xp: verifiedPlayerProfile?.xp || 0,
       level: verifiedPlayerProfile?.level || 1,
       cards: { yellow: 0, red: 0 },
@@ -2501,7 +2518,8 @@ io.on('connection', (socket) => {
           name: p.name,
           score: 0,
           disconnected: p.disconnected,
-          equippedItems: p.equippedItems
+          equippedItems: p.equippedItems,
+          isAdmin: Boolean(p.isAdmin)
         }))
       });
       startNextDrawRound(code);
@@ -2516,6 +2534,7 @@ io.on('connection', (socket) => {
         score: 0,
         disconnected: p.disconnected,
         equippedItems: p.equippedItems,
+        isAdmin: Boolean(p.isAdmin),
         cards: { yellow: 0, red: 0 },
         team: room.predictTeams?.[id] || null
       }))
@@ -2634,6 +2653,7 @@ io.on('connection', (socket) => {
     // in the leaderboard/results like anyone else's.
     if (room.config?.judgeMode === 'host' && socket.id === room.host && !room.players[socket.id] && room.config?.answerMode === 'written') {
       room.players[socket.id] = { name: room.hostName, userId: room.hostUserId || null, disconnected: false, equippedItems: room.hostEquippedItems || null };
+      room.players[socket.id].isAdmin = Boolean(room.hostIsAdmin);
       room.scores[socket.id] = room.scores[socket.id] || 0;
       room.correct[socket.id] = room.correct[socket.id] || 0;
       room.wrong[socket.id] = room.wrong[socket.id] || 0;
@@ -2644,6 +2664,7 @@ io.on('connection', (socket) => {
         name: room.hostName,
         score: room.scores[socket.id],
         equippedItems: room.hostEquippedItems || null,
+        isAdmin: Boolean(room.hostIsAdmin),
         cards: room.cards[socket.id],
         userId: room.hostUserId || null,
       });
@@ -2692,12 +2713,14 @@ io.on('connection', (socket) => {
 
     const senderName = player ? player.name : room.hostName;
     const equippedItems = player ? player.equippedItems : room.hostEquippedItems;
+    const isAdmin = player ? Boolean(player.isAdmin) : Boolean(room.hostIsAdmin);
 
     const msgObj = {
       id: Date.now() + '-' + Math.random().toString(36).substring(2, 7),
       senderId: socket.id,
       senderName: senderName || 'لاعب',
       equippedItems,
+      isAdmin,
       text: text.trim().slice(0, 150),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
@@ -2720,12 +2743,14 @@ io.on('connection', (socket) => {
 
     const senderName = player ? player.name : room.hostName;
     const equippedItems = player ? player.equippedItems : room.hostEquippedItems;
+    const isAdmin = player ? Boolean(player.isAdmin) : Boolean(room.hostIsAdmin);
 
     const msgObj = {
       id: Date.now() + '-' + Math.random().toString(36).substring(2, 7),
       senderId: socket.id,
       senderName: senderName || 'لاعب',
       equippedItems,
+      isAdmin,
       audio,
       duration: duration || 3,
       type: 'voice',
@@ -4023,6 +4048,7 @@ function normalizeArabic(text) {
       if (room.players[socket.id]) {
         room.players[socket.id].disconnected = false;
         room.players[socket.id].aiControlled = false;
+        room.players[socket.id].isAdmin = Boolean(room.hostIsAdmin);
       }
       socket.join(code);
       if (room.config?.gameMode === 'predict' && participatingHostId && participatingHostId !== socket.id) {
@@ -4048,6 +4074,7 @@ function normalizeArabic(text) {
           wrongAnswers: room.wrong[id] || 0,
           disconnected: p.disconnected,
           equippedItems: p.equippedItems,
+          isAdmin: Boolean(p.isAdmin),
           xp: p.xp || 0,
           level: p.level || 1,
           cards: room.cards?.[id] || { yellow: 0, red: 0 }
@@ -4082,6 +4109,7 @@ function normalizeArabic(text) {
           userId: room.players[socket.id].userId || null,
           score: room.scores[socket.id] || 0,
           equippedItems: room.players[socket.id].equippedItems,
+          isAdmin: Boolean(room.players[socket.id].isAdmin),
           team: room.predictTeams?.[socket.id] || null,
           cards: room.cards?.[socket.id] || { yellow: 0, red: 0 },
         });

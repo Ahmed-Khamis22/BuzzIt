@@ -89,7 +89,7 @@ function snapshot(room, id) {
     messages: (g.messages || []).filter(m => m.team === g.teams[id]).slice(-30),
     rewardStatus: g.rewardStatus,
     rewards: { coins: g.rewards?.coinsEarnedMap?.[room.players[id]?.userId] || 0, xp: g.rewards?.xpEarnedMap?.[room.players[id]?.userId] || 0 },
-    players: Object.entries(room.players).map(([pid, p]) => ({ id: pid, name: p.name, team: g.teams[pid], disconnected: !!p.disconnected, developmentOnly: !!p.developmentOnly, equippedItems: p.equippedItems })),
+    players: Object.entries(room.players).map(([pid, p]) => ({ id: pid, name: p.name, team: g.teams[pid], disconnected: !!p.disconnected, developmentOnly: !!p.developmentOnly, equippedItems: p.equippedItems, isAdmin: Boolean(p.isAdmin) })),
     // Never serialize the hidden key to a guesser, even to the room owner.
     board: g.board.map((c, index) => ({ index, word: c.word, revealed: c.revealed, color: captain || c.revealed || g.phase === 'finished' ? c.color : null })),
   };
@@ -343,6 +343,7 @@ function createCodenamesService({ io, rooms, migrateHost, publicUpdate, saveResu
       score: 0,
       disconnected: player.disconnected,
       equippedItems: player.equippedItems,
+      isAdmin: Boolean(player.isAdmin),
     }));
     io.to(code).emit('game-started', { players });
     schedule(code, true);
