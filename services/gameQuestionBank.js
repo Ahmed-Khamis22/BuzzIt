@@ -76,7 +76,80 @@ const SOLO_HARD_TOPICS = [
   ['شيئًا تجده في حقيبة الإسعافات الأولية', ['شاش', 'قطن', 'مطهر', 'لاصق جروح', 'مسكن']],
   ['دولة عربية في أفريقيا', ['مصر', 'المغرب', 'الجزائر', 'تونس', 'السودان', 'ليبيا', 'موريتانيا']],
   ['شكلاً هندسيًا له أربعة أضلاع', ['مربع', 'مستطيل', 'معين', 'شبه منحرف']],
+  ['قطبًا من قطبي المغناطيس', ['شمالي', 'جنوبي']],
+  ['وجهًا من وجهي العملة المعدنية', ['صورة', 'كتابة']],
+  ['لونًا من لوني علم أوكرانيا', ['أزرق', 'أصفر']],
+  ['طرفًا من طرفي اليوم', ['نهار', 'ليل']],
+  ['جهةً من جهتي الشمال والجنوب', ['شمال', 'جنوب']],
+  ['إجابةً من إجابتي نعم أو لا', ['نعم', 'لا']],
 ];
+
+// These questions have naturally bounded answer sets. The lists are used to
+// choose the hidden forbidden word and to give the judge examples; they are
+// never a whitelist for judging a player's answer.
+const SOLO_MEDIUM_TOPICS = [
+  ['يومًا من أيام الأسبوع', ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة']],
+  ['قارة من قارات العالم', ['أفريقيا', 'آسيا', 'أوروبا', 'أمريكا الشمالية', 'أمريكا الجنوبية', 'أستراليا', 'أنتاركتيكا']],
+  ['لونًا من ألوان قوس قزح', ['أحمر', 'برتقالي', 'أصفر', 'أخضر', 'أزرق', 'نيلي', 'بنفسجي']],
+  ['إمارة من إمارات دولة الإمارات', ['أبوظبي', 'دبي', 'الشارقة', 'عجمان', 'أم القيوين', 'رأس الخيمة', 'الفجيرة']],
+  ['نغمة من السلم الموسيقي', ['دو', 'ري', 'مي', 'فا', 'صول', 'لا', 'سي']],
+  ['حرفًا من أول سبعة حروف في الأبجدية العربية', ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ']],
+  ['حرفًا من أول سبعة حروف في الأبجدية الإنجليزية', ['A', 'B', 'C', 'D', 'E', 'F', 'G']],
+  ['شهرًا من أول سبعة أشهر في السنة الميلادية', ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو']],
+  ['رقمًا من الأرقام من واحد إلى سبعة', ['واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة']],
+  ['دولة من دول مجلس التعاون الخليجي', ['السعودية', 'الإمارات', 'الكويت', 'قطر', 'البحرين', 'عُمان']],
+  ['قطعة من قطع الشطرنج', ['الملك', 'الوزير', 'القلعة', 'الفيل', 'الحصان', 'الجندي']],
+  ['رقمًا يظهر على حجر النرد', ['واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة']],
+  ['وجهًا من أوجه المكعب', ['الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس']],
+  ['دولة من دول شبه الجزيرة العربية', ['السعودية', 'اليمن', 'عُمان', 'الإمارات', 'قطر', 'البحرين', 'الكويت']],
+  ['عاصمة من عواصم دول الخليج', ['الرياض', 'أبوظبي', 'الكويت', 'الدوحة', 'المنامة', 'مسقط']],
+  ['لغة من اللغات الرسمية للأمم المتحدة', ['العربية', 'الإنجليزية', 'الصينية', 'الفرنسية', 'الروسية', 'الإسبانية']],
+  ['وحدة من الوحدات الأساسية السبع في النظام الدولي', ['المتر', 'الكيلوجرام', 'الثانية', 'الأمبير', 'الكلفن', 'المول', 'الكانديلا']],
+  ['عجيبة من عجائب الدنيا السبع القديمة', ['هرم خوفو', 'حدائق بابل', 'تمثال زيوس', 'معبد أرتميس', 'ضريح هاليكارناسوس', 'تمثال رودس', 'منارة الإسكندرية']],
+  ['محيطًا من محيطات العالم', ['الهادئ', 'الأطلسي', 'الهندي', 'المتجمد الشمالي', 'الجنوبي']],
+  ['لونًا من ألوان علم جنوب أفريقيا', ['أحمر', 'أزرق', 'أخضر', 'أصفر', 'أبيض', 'أسود']],
+];
+
+const SOLO_TIGHT_TOPICS = [
+  ['كوكبًا صخريًا من الكواكب الداخلية', ['عطارد', 'الزهرة', 'الأرض', 'المريخ']],
+  ['نوعًا من أنواع المثلث حسب أضلاعه', ['متساوي الأضلاع', 'متساوي الساقين', 'مختلف الأضلاع']],
+  ['نوعًا من أنواع الزوايا الأساسية', ['حادة', 'قائمة', 'منفرجة']],
+  ['حالة من حالات المادة الأساسية', ['صلبة', 'سائلة', 'غازية']],
+  ['لونًا من ألوان إشارة المرور', ['أحمر', 'أصفر', 'أخضر']],
+  ['نوعًا من أنواع الهمزة في أول الكلمة', ['همزة قطع', 'همزة وصل']],
+  ['قطبًا من قطبي المغناطيس', ['شمالي', 'جنوبي']],
+  ['وجهًا من وجهي العملة المعدنية', ['صورة', 'كتابة']],
+  ['طرفًا من طرفي اليوم', ['نهار', 'ليل']],
+  ['إجابةً من إجابتي نعم أو لا', ['نعم', 'لا']],
+  ['لونًا من لوني علم أوكرانيا', ['أزرق', 'أصفر']],
+  ['اتجاهًا من الاتجاهين الرأسي والأفقي', ['رأسي', 'أفقي']],
+  ['نوعًا من نوعي الشحنة الكهربائية', ['موجبة', 'سالبة']],
+  ['طرفًا من طرفي خط الأعداد', ['موجب', 'سالب']],
+  ['نوعًا من نوعي الانقسام الخلوي الأساسيين', ['متساوي', 'اختزالي']],
+  ['حالةً من حالتي تشغيل الجهاز', ['تشغيل', 'إيقاف']],
+];
+
+const SOLO_STAGE_THREE_TOPICS = SOLO_HARD_TOPICS.filter(([, answers]) => answers.length >= 4);
+SOLO_STAGE_THREE_TOPICS.push(
+  ['كوكبًا من كواكب المجموعة الشمسية الداخلية', ['عطارد', 'الزهرة', 'الأرض', 'المريخ']],
+  ['شكلًا من الأشكال الهندسية الأساسية', ['دائرة', 'مثلث', 'مربع', 'مستطيل']],
+  ['مرحلةً من مراحل دورة الماء', ['التبخر', 'التكاثف', 'الهطول', 'التجمع']],
+  ['مرحلةً من مراحل الانقسام المتساوي', ['التمهيدي', 'الاستوائي', 'الانفصالي', 'النهائي']],
+);
+const SOLO_STAGE_FOUR_TOPICS = [
+  ...SOLO_HARD_TOPICS.filter(([, answers]) => answers.length === 3),
+  ...SOLO_TIGHT_TOPICS.filter(([, answers]) => answers.length === 3),
+  ['نوعًا من أنواع الكلمة في العربية', ['اسم', 'فعل', 'حرف']],
+  ['زمنًا من أزمنة الفعل', ['ماضٍ', 'مضارع', 'أمر']],
+  ['نوعًا من أنواع المثلث حسب زواياه', ['حاد الزوايا', 'قائم الزاوية', 'منفرج الزاوية']],
+  ['إشارةً من إشارات العدد', ['موجب', 'سالب', 'صفر']],
+  ['نوعًا من أنواع الجمع في العربية', ['جمع مذكر سالم', 'جمع مؤنث سالم', 'جمع تكسير']],
+  ['حرفًا من حروف المد', ['الألف', 'الواو', 'الياء']],
+  ['نوعًا من أنواع الحركة الأساسية', ['انتقالية', 'دورانية', 'اهتزازية']],
+  ['نوعًا من أنواع الروافع', ['النوع الأول', 'النوع الثاني', 'النوع الثالث']],
+].slice(0, 16);
+const SOLO_STAGE_FIVE_TOPICS = SOLO_HARD_TOPICS.filter(([, answers]) => answers.length === 2)
+  .concat(SOLO_TIGHT_TOPICS.filter(([, answers]) => answers.length === 2));
 
 // These become the late rounds in Predict. Every prompt still has six or
 // more natural answers, which is the minimum needed for a six-player room.
@@ -96,17 +169,31 @@ const PREDICT_HARD_TOPICS = [
 function buildManagedQuestionBank() {
   const soloQuestions = [];
   const predictQuestions = [];
-  TOPICS.forEach(([label, answers], topicIndex) => {
+  const makeSoloQuestion = ({ bankKey, text, answers, answerIndex, stage }) => {
+    const answer = answers[answerIndex % answers.length];
+    const candidates = [answer, ...answers.filter((value) => value !== answer)];
+    return {
+      bankKey,
+      text,
+      category: 'dont-say-my-word',
+      answer,
+      acceptedAnswers: candidates.filter((value) => value !== answer),
+      judgeMode: 'open',
+      difficulty: stage === 1 ? 'easy' : stage === 2 ? 'medium' : 'hard',
+      soloStage: stage,
+    };
+  };
+
+  TOPICS.slice(0, 20).forEach(([label, answers], topicIndex) => {
     if (answers.length < 7) throw new Error(`Question topic has too few answers: ${label}`);
-    const difficulty = topicIndex < 10 ? 'easy' : 'medium';
-    const answer = answers[topicIndex % answers.length];
-    soloQuestions.push({
+    soloQuestions.push(makeSoloQuestion({
       bankKey: `solo-${topicIndex}`,
       text: `اذكر ${label}.`,
-      category: 'dont-say-my-word', answer,
-      acceptedAnswers: answers.filter((value) => value !== answer),
-      judgeMode: 'closed', difficulty,
-    });
+      answers,
+      answerIndex: topicIndex,
+      stage: 1,
+    }));
+    const difficulty = topicIndex < 10 ? 'easy' : 'medium';
     predictQuestions.push({
       bankKey: `predict-${topicIndex}`,
       text: `اذكر ${label}.`,
@@ -114,12 +201,30 @@ function buildManagedQuestionBank() {
       judgeMode: 'open', judgeEvaluated: true, difficulty,
     });
   });
-  SOLO_HARD_TOPICS.forEach(([label, answers], index) => {
-    const answer = answers[index % answers.length];
-    soloQuestions.push({
-      bankKey: `solo-hard-${index}`, text: `اذكر ${label}.`, category: 'dont-say-my-word',
-      answer, acceptedAnswers: answers.filter((value) => value !== answer), judgeMode: 'closed', difficulty: 'hard',
-    });
+  SOLO_MEDIUM_TOPICS.forEach(([label, answers], index) => {
+    if (answers.length < 5 || answers.length > 7) throw new Error(`Medium solo topic must have 5-7 natural answers: ${label}`);
+    soloQuestions.push(makeSoloQuestion({
+      bankKey: `solo-stage-2-${index}`, text: `اذكر ${label}.`, answers,
+      answerIndex: index, stage: 2,
+    }));
+  });
+  SOLO_STAGE_THREE_TOPICS.forEach(([label, answers], index) => {
+    soloQuestions.push(makeSoloQuestion({
+      bankKey: `solo-stage-3-${index}`, text: `اذكر ${label}.`, answers,
+      answerIndex: index, stage: 3,
+    }));
+  });
+  SOLO_STAGE_FOUR_TOPICS.forEach(([label, answers], index) => {
+    soloQuestions.push(makeSoloQuestion({
+      bankKey: `solo-stage-4-${index}`, text: `اذكر ${label}.`, answers,
+      answerIndex: index, stage: 4,
+    }));
+  });
+  SOLO_STAGE_FIVE_TOPICS.forEach(([label, answers], index) => {
+    soloQuestions.push(makeSoloQuestion({
+      bankKey: `solo-stage-5-${index}`, text: `اذكر ${label}.`, answers,
+      answerIndex: index, stage: 5,
+    }));
   });
   PREDICT_HARD_TOPICS.forEach(([label], index) => {
     predictQuestions.push({

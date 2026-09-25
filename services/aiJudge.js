@@ -711,11 +711,15 @@ class AiJudge {
       'أرجع JSON فقط بالشكل: {"answer":"yes","correctGuess":false,"intent":"question","guess":"","canonicalClaim":"الصفة الثابتة المقصودة","reason":"سبب واقعي قصير","reply":"نعم"}.',
     ].join('\n');
     const result = await this.runWithProviderFallback(async (provider) => {
-      // This is an interactive button press. Two short independent attempts
-      // cap a bad-provider wait at about seven seconds instead of ~26 seconds.
+      // This is an interactive button press. Keep each provider attempt short,
+      // but allow a third independent provider when one gives no useful answer.
       const raw = await provider.run(prompt, TEN_BY_TEN_ANSWER_SCHEMA, 3500);
-      return parseTenByTenAnswer(raw);
-    }, 'AI_TEN_BY_TEN_ANSWER_UNAVAILABLE', { maxProviders: 2, maxAttempts: 1 });
+      const parsed = parseTenByTenAnswer(raw);
+      if (parsed.answer === 'unknown' && String(question).trim().length >= 8) {
+        throw new Error('AI_TEN_BY_TEN_UNEXPECTED_UNKNOWN');
+      }
+      return parsed;
+    }, 'AI_TEN_BY_TEN_ANSWER_UNAVAILABLE', { maxProviders: 3, maxAttempts: 1 });
     return { ...result.value, provider: result.provider };
   }
 

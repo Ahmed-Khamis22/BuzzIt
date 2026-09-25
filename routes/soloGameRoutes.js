@@ -11,7 +11,6 @@ const { getPersistentJudgment, savePersistentJudgment } = require('../services/s
 const { awardSoloProgress, calculateLevel } = require('../services/gameService');
 const { consumeAdView } = require('../services/adRewards');
 const {
-  buildDifficultyCurve,
   evaluateContextualAnswer,
   evaluateKnownAnswer,
   normalizeArabic,
@@ -45,10 +44,7 @@ const RECENT_SECRET_HISTORY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 // budget remains the protection against a whole-server spike.
 const TEN_BY_TEN_DAILY_GAME_LIMIT = Math.max(1, Number(process.env.TEN_BY_TEN_DAILY_GAME_LIMIT) || 3);
 const TEN_BY_TEN_MAX_ACTIONS = Math.max(80, Number(process.env.TEN_BY_TEN_MAX_ACTIONS) || 120);
-const tenByTenDailyGames = new Map();
-const tenByTenExtraGames = new Map();
 const DONT_SAY_MY_WORD_DAILY_GAME_LIMIT = Math.max(1, Number(process.env.DONT_SAY_MY_WORD_DAILY_GAME_LIMIT) || 3);
-const dontSayMyWordDailyGames = new Map();
 
 // The database bank is the primary source. This embedded bank keeps the solo
 // game playable while a fresh deployment is still syncing Mongo questions.
@@ -97,32 +93,28 @@ function clearUserChallenges(userId) {
 
 function pruneTenByTenSessions() {
   const now = Date.now();
-  const today = new Date().toISOString().slice(0, 10);
   for (const [sessionId, session] of tenByTenSessions.entries()) {
     if (session.expiresAt <= now) tenByTenSessions.delete(sessionId);
   }
   for (const [userId, history] of recentTenByTenSecretsByUser.entries()) {
     if (history.updatedAt + RECENT_SECRET_HISTORY_TTL_MS <= now) recentTenByTenSecretsByUser.delete(userId);
   }
-  for (const key of tenByTenDailyGames.keys()) {
-    if (!key.endsWith(`:${today}`)) tenByTenDailyGames.delete(key);
-  }
-  for (const key of tenByTenExtraGames.keys()) {
-    if (!key.endsWith(`:${today}`)) tenByTenExtraGames.delete(key);
-  }
-  for (const key of dontSayMyWordDailyGames.keys()) {
-    if (!key.endsWith(`:${today}`)) dontSayMyWordDailyGames.delete(key);
-  }
 }
 
-function tenByTenDailyKey(userId) {
-  return `${String(userId)}:${new Date().toISOString().slice(0, 10)}`;
+function cairoDayKey() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
-function getTenByTenAllowance(userId) {
-  const key = tenByTenDailyKey(userId);
-  const playedGamesToday = tenByTenDailyGames.get(key) || 0;
-  const extraGameClaimed = Boolean(tenByTenExtraGames.get(key));
+async function getTenByTenAllowance(userId) {
+  const today = cairoDayKey();
+  const user = await User.findById(userId).select('soloDailyUsage').lean();
+  const usage = user?.soloDailyUsage || {};
+  const playedGamesToday = usage.tenByTenDate === today ? Number(usage.tenByTenGames) || 0 : 0;
+  const extraGameClaimed = usage.tenByTenExtraDate === today && Boolean(usage.tenByTenExtraGameClaimed);
   const totalGamesToday = TEN_BY_TEN_DAILY_GAME_LIMIT + (extraGameClaimed ? 1 : 0);
   return {
     dailyGames: TEN_BY_TEN_DAILY_GAME_LIMIT,
@@ -133,21 +125,34 @@ function getTenByTenAllowance(userId) {
   };
 }
 
-function reserveTenByTenGame(userId) {
-  const key = tenByTenDailyKey(userId);
-  const used = tenByTenDailyGames.get(key) || 0;
-  const extraGameClaimed = Boolean(tenByTenExtraGames.get(key));
-  if (used >= TEN_BY_TEN_DAILY_GAME_LIMIT + (extraGameClaimed ? 1 : 0)) return false;
-  tenByTenDailyGames.set(key, used + 1);
-  return true;
+async function reserveTenByTenGame(userId) {
+  const today = cairoDayKey();
+  const allowance = await getTenByTenAllowance(userId);
+  const maxGames = TEN_BY_TEN_DAILY_GAME_LIMIT + (allowance.extraGameClaimed ? 1 : 0);
+  if (allowance.playedGamesToday >= maxGames) return false;
+
+  const currentDayResult = await User.updateOne({
+    _id: userId,
+    'soloDailyUsage.tenByTenDate': today,
+    'soloDailyUsage.tenByTenGames': { $lt: maxGames },
+  }, { $inc: { 'soloDailyUsage.tenByTenGames': 1 } });
+  if (currentDayResult.modifiedCount) return true;
+
+  const resetDayResult = await User.updateOne({
+    _id: userId,
+    'soloDailyUsage.tenByTenDate': { $ne: today },
+  }, { $set: {
+    'soloDailyUsage.tenByTenDate': today,
+    'soloDailyUsage.tenByTenGames': 1,
+  } });
+  return Boolean(resetDayResult.modifiedCount);
 }
 
-function dontSayMyWordDailyKey(userId) {
-  return `${String(userId)}:${new Date().toISOString().slice(0, 10)}`;
-}
-
-function getDontSayMyWordAllowance(userId) {
-  const playedGamesToday = dontSayMyWordDailyGames.get(dontSayMyWordDailyKey(userId)) || 0;
+async function getDontSayMyWordAllowance(userId) {
+  const today = cairoDayKey();
+  const user = await User.findById(userId).select('soloDailyUsage').lean();
+  const usage = user?.soloDailyUsage || {};
+  const playedGamesToday = usage.dontSayMyWordDate === today ? Number(usage.dontSayMyWordGames) || 0 : 0;
   return {
     dailyGames: DONT_SAY_MY_WORD_DAILY_GAME_LIMIT,
     playedGamesToday,
@@ -155,12 +160,26 @@ function getDontSayMyWordAllowance(userId) {
   };
 }
 
-function reserveDontSayMyWordGame(userId) {
-  const key = dontSayMyWordDailyKey(userId);
-  const used = dontSayMyWordDailyGames.get(key) || 0;
-  if (used >= DONT_SAY_MY_WORD_DAILY_GAME_LIMIT) return false;
-  dontSayMyWordDailyGames.set(key, used + 1);
-  return true;
+async function reserveDontSayMyWordGame(userId) {
+  const today = cairoDayKey();
+  const allowance = await getDontSayMyWordAllowance(userId);
+  if (allowance.remainingGames <= 0) return false;
+
+  const currentDayResult = await User.updateOne({
+    _id: userId,
+    'soloDailyUsage.dontSayMyWordDate': today,
+    'soloDailyUsage.dontSayMyWordGames': { $lt: DONT_SAY_MY_WORD_DAILY_GAME_LIMIT },
+  }, { $inc: { 'soloDailyUsage.dontSayMyWordGames': 1 } });
+  if (currentDayResult.modifiedCount) return true;
+
+  const resetDayResult = await User.updateOne({
+    _id: userId,
+    'soloDailyUsage.dontSayMyWordDate': { $ne: today },
+  }, { $set: {
+    'soloDailyUsage.dontSayMyWordDate': today,
+    'soloDailyUsage.dontSayMyWordGames': 1,
+  } });
+  return Boolean(resetDayResult.modifiedCount);
 }
 
 function getTenByTenSession(req) {
@@ -278,9 +297,43 @@ async function sendDontSayJudgment(res, challenge, payload) {
 
 async function loadQuestionPool() {
   const questions = await Question.find({ category: 'dont-say-my-word' })
-    .select('_id text answer acceptedAnswers judgeMode')
+    .select('_id text answer acceptedAnswers judgeMode bankKey soloStage')
     .lean();
   return questions.length ? questions : FALLBACK_SOLO_QUESTIONS;
+}
+
+function questionAtStreak(pool, streak, excludedQuestionIds = new Set()) {
+  if (!pool.length) return null;
+  const grouped = new Map([1, 2, 3, 4, 5].map((stage) => [stage, []]));
+  for (const question of pool) {
+    const stage = Number(question.soloStage) || 1;
+    if (grouped.has(stage)) grouped.get(stage).push(question);
+  }
+  for (const questions of grouped.values()) {
+    questions.sort((first, second) => (
+      answerPool(second).length - answerPool(first).length
+      || String(first.bankKey || first._id).localeCompare(String(second.bankKey || second._id), 'en', { numeric: true })
+    ));
+  }
+
+  let remaining = Math.max(0, Number(streak) || 0);
+  const stageLengths = [20, 20, 20, 16, Number.POSITIVE_INFINITY];
+  for (let index = 0; index < stageLengths.length; index += 1) {
+    const stageLength = stageLengths[index];
+    const questions = grouped.get(index + 1);
+    if (!questions.length) {
+      if (stageLength !== Number.POSITIVE_INFINITY) remaining -= stageLength;
+      continue;
+    }
+    if (remaining < stageLength || stageLength === Number.POSITIVE_INFINITY) {
+      const available = questions.filter((question) => !excludedQuestionIds.has(String(question._id)));
+      const choices = available.length ? available : questions;
+      return choices[remaining % choices.length];
+    }
+    remaining -= stageLength;
+  }
+
+  return grouped.get(5)?.[0] || pool[pool.length - 1];
 }
 
 router.get('/dont-say-my-word', auth, async (req, res) => {
@@ -288,18 +341,19 @@ router.get('/dont-say-my-word', auth, async (req, res) => {
     pruneExpiredChallenges();
     const requestedStreak = Math.max(0, Number(req.query?.streak) || 0);
     const newRun = String(req.query?.newRun || '') === '1';
-    if (newRun && !reserveDontSayMyWordGame(req.userId)) {
+    const pool = await loadQuestionPool();
+    if (!pool.length) return res.status(404).json({ error: 'NO_SOLO_QUESTIONS' });
+    if (newRun && !await reserveDontSayMyWordGame(req.userId)) {
       return res.status(429).json({
         error: 'DONT_SAY_MY_WORD_DAILY_LIMIT',
         message: `خلصت ${DONT_SAY_MY_WORD_DAILY_GAME_LIMIT} ألعاب «ما تقولش كلمتي» المتاحة النهارده. ارجع بكرة.`,
       });
     }
     if (newRun) clearUserChallenges(req.userId);
-    const pool = await loadQuestionPool();
-    if (!pool.length) return res.status(404).json({ error: 'NO_SOLO_QUESTIONS' });
-    const orderedPool = buildDifficultyCurve(pool, pool.length);
     const batchSize = Math.min(40, Math.max(10, Number(req.query?.limit) || 25));
-    const questions = Array.from({ length: batchSize }, (_, offset) => orderedPool[(requestedStreak + offset) % orderedPool.length]);
+    const questions = Array.from({ length: batchSize }, (_, offset) => (
+      questionAtStreak(pool, requestedStreak + offset)
+    ));
     // A new streak is one played solo game. Its result is intentionally not a
     // normal win: the player can keep an open-ended streak instead.
     const gameProgress = newRun
@@ -375,10 +429,8 @@ router.post('/dont-say-my-word/replacement', auth, async (req, res) => {
         .map((challenge) => challenge.questionId),
     );
     const round = Math.max(1, Number(req.body?.round) || 1);
-    const pool = (await loadQuestionPool()).filter((question) => !excludedQuestionIds.has(String(question._id)));
-    const fallbackPool = pool.length ? pool : await loadQuestionPool();
-    const curve = buildDifficultyCurve(fallbackPool, fallbackPool.length);
-    const question = curve[(round - 1) % curve.length];
+    const pool = await loadQuestionPool();
+    const question = questionAtStreak(pool, round - 1, excludedQuestionIds);
     if (!question) return res.status(404).json({ error: 'NO_REPLACEMENT_QUESTION' });
     return res.json(createChallenge(question, req.userId, round - 1));
   } catch (error) {
@@ -421,7 +473,6 @@ router.post('/dont-say-my-word/judge', auth, judgeLimiter, async (req, res) => {
         confidence: local.confidence,
       });
     }
-
     const cacheKey = `${question.questionId}:${normalizeArabic(question.answer)}:${normalizeArabic(answer)}`;
     try {
       let judgment = getCachedJudgment(cacheKey);
@@ -501,12 +552,10 @@ router.post('/dont-say-my-word/judge', auth, judgeLimiter, async (req, res) => {
           fallback: true,
         });
       }
-      return sendDontSayJudgment(res, question, {
-        valid: true,
-        outcome: 'valid',
-        reason: 'تم قبول الإجابة احتياطيًا لأن خدمات التحكيم الذكي غير متاحة مؤقتًا.',
-        source: 'degraded_fail_open',
-        fallback: true,
+      console.warn('[solo-judge-unavailable]', String(aiError?.message || 'unknown').slice(0, 120));
+      return res.status(503).json({
+        error: 'SOLO_AI_UNAVAILABLE',
+        message: 'الحكم الذكي مش متاح لحظيًا. إجابتك لسه متحسبتش؛ جرّب تاني بعد لحظة.',
       });
     }
   } catch (error) {
@@ -551,19 +600,19 @@ router.post('/dont-say-my-word/complete', auth, async (req, res) => {
   }
 });
 
-router.get('/ten-by-ten/allowance', auth, (req, res) => {
+router.get('/ten-by-ten/allowance', auth, async (req, res) => {
   pruneTenByTenSessions();
-  return res.json(getTenByTenAllowance(req.userId));
+  return res.json(await getTenByTenAllowance(req.userId));
 });
 
-router.get('/dont-say-my-word/allowance', auth, (req, res) => {
+router.get('/dont-say-my-word/allowance', auth, async (req, res) => {
   pruneTenByTenSessions();
-  return res.json(getDontSayMyWordAllowance(req.userId));
+  return res.json(await getDontSayMyWordAllowance(req.userId));
 });
 
 router.post('/ten-by-ten/extra-game', auth, async (req, res) => {
   pruneTenByTenSessions();
-  const allowance = getTenByTenAllowance(req.userId);
+  const allowance = await getTenByTenAllowance(req.userId);
   if (allowance.extraGameClaimed) {
     return res.status(409).json({ error: 'TEN_BY_TEN_EXTRA_ALREADY_CLAIMED', message: 'استخدمت إعلانك الإضافي لليوم بالفعل.' });
   }
@@ -574,13 +623,28 @@ router.post('/ten-by-ten/extra-game', auth, async (req, res) => {
   const view = await consumeAdView(req.userId, 'ten-by-ten-extra-game');
   if (!view.ok) return res.status(402).json({ error: 'AD_NOT_VERIFIED', message: view.error });
 
-  tenByTenExtraGames.set(tenByTenDailyKey(req.userId), true);
-  return res.json({ ...getTenByTenAllowance(req.userId), verified: view.verified });
+  const today = cairoDayKey();
+  const currentDayClaim = await User.updateOne({
+    _id: req.userId,
+    'soloDailyUsage.tenByTenExtraDate': today,
+    'soloDailyUsage.tenByTenExtraGameClaimed': { $ne: true },
+  }, { $set: { 'soloDailyUsage.tenByTenExtraGameClaimed': true } });
+  const resetDayClaim = currentDayClaim.modifiedCount ? currentDayClaim : await User.updateOne({
+    _id: req.userId,
+    'soloDailyUsage.tenByTenExtraDate': { $ne: today },
+  }, { $set: {
+    'soloDailyUsage.tenByTenExtraDate': today,
+    'soloDailyUsage.tenByTenExtraGameClaimed': true,
+  } });
+  if (!resetDayClaim.modifiedCount) {
+    return res.status(409).json({ error: 'TEN_BY_TEN_EXTRA_ALREADY_CLAIMED', message: 'استخدمت إعلانك الإضافي لليوم بالفعل.' });
+  }
+  return res.json({ ...(await getTenByTenAllowance(req.userId)), verified: view.verified });
 });
 
 router.post('/ten-by-ten/start', auth, judgeLimiter, async (req, res) => {
   pruneTenByTenSessions();
-  if (!reserveTenByTenGame(req.userId)) {
+  if (!await reserveTenByTenGame(req.userId)) {
     return res.status(429).json({
       error: 'TEN_BY_TEN_DAILY_LIMIT',
       message: `خلصت ${TEN_BY_TEN_DAILY_GAME_LIMIT} تحديات في بالك إيه؟ المتاحة النهارده. ارجع بكرة.`,

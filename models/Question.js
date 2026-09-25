@@ -19,6 +19,7 @@ const questionSchema = new mongoose.Schema({
   judgeEvaluated: { type: Boolean, default: false },
   choices: { type: [String], default: [] },
   difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },
+  soloStage: { type: Number, min: 1, max: 5, default: null },
   flagImage: { type: String },
   isCustomTrivia: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
