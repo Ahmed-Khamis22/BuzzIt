@@ -127,7 +127,7 @@ router.post('/case-file/start', auth, async (req, res) => {
     const record = progress.caseRecords[caseData.id] || {};
     progress.activeInvestigation = {
       caseId: caseData.id, startedAt: now, elapsedSeconds: 0, timerVersion: 2, examinedEvidenceIds: [], hintsUsed: 0,
-      extraHintsUsed: 0, rewardedHintText: '', wrongAccusations: 0,
+      extraHintsUsed: 0, rewardedHintText: '', hintHistory: [], wrongAccusations: 0,
       status: 'ACTIVE', replay: progress.solvedCaseIds.includes(caseData.id),
     };
     if (retryRequired) {
@@ -225,6 +225,7 @@ router.post('/case-file/hint-rewarded', auth, async (req, res) => {
         'soloStats.caseFile.activeInvestigation.rewardedHintText': hint,
         'soloStats.caseFile.activeInvestigation.lastHint': hint,
       },
+      $push: { 'soloStats.caseFile.activeInvestigation.hintHistory': hint },
     };
     const hintState = await User.findOneAndUpdate(
       {
@@ -244,6 +245,7 @@ router.post('/case-file/hint-rewarded', auth, async (req, res) => {
     }
     return res.json({
       hint,
+      hintHistory: hintState.soloStats.caseFile.activeInvestigation.hintHistory || [hint],
       hintsUsed: hintsUsed + 1,
       extraHintsUsed: extraHintsUsed + (usesStandardHint ? 0 : 1),
       idempotent: false,
