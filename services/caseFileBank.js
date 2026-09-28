@@ -8,10 +8,9 @@ const CHAPTERS = [
   },
   {
     id: 'chapter_2', title: 'قبل الزيارة', description: 'أزمات متصاعدة تهدد منحة الخير', order: 2,
-    // Production stays locked even when NODE_ENV is missing. Open it only in
-    // explicitly identified dev/test environments or with a local opt-in.
-    openForTesting: ['development', 'test'].includes(process.env.NODE_ENV)
-      || process.env.CASE_FILE_OPEN_CHAPTERS_FOR_TESTING === 'true',
+    // Keep campaign progression locked by default, regardless of NODE_ENV.
+    // Tests may open chapter two only through an explicit local opt-in.
+    openForTesting: process.env.CASE_FILE_OPEN_CHAPTERS_FOR_TESTING === 'true',
     requiredCaseIds: ['missing_donor_laptop', 'fake_donor_call', 'forged_purchase_invoices', 'restoration_sabotage', 'false_fire_alarm'],
     caseIds: ['missing_donor_laptop', 'fake_donor_call', 'forged_purchase_invoices', 'restoration_sabotage', 'false_fire_alarm'],
     caseSlots: ['اللابتوب المفقود', 'المتبرع المزيّف', 'فواتير على الورق', 'تخريب الترميم', 'إنذار يوم الزيارة'],
