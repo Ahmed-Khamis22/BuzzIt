@@ -272,13 +272,13 @@ function closeRoom(code, room, message, excludedSocketId = null) {
 }
 
 function scheduleUnderMinimumRoomClose(code, room) {
-  if (!room || room.minimumPlayersTimeout) return;
+  if (!room || room.status !== 'PLAYING' || room.minimumPlayersTimeout) return;
   // Active Predict matches have their own reconnect and AI seat-replacement window.
   if (room.config?.gameMode === 'predict' && room.status === 'PLAYING') return;
   room.minimumPlayersTimeout = setTimeout(() => {
     if (rooms[code] !== room) return;
     room.minimumPlayersTimeout = null;
-    if (!roomHasMinimumPlayers(room)) {
+    if (room.status === 'PLAYING' && !roomHasMinimumPlayers(room)) {
       closeRoom(code, room, 'تم إغلاق الغرفة لأن عدد اللاعبين بقى أقل من الحد المطلوب للعب.');
     }
   }, 15000);
@@ -3519,7 +3519,7 @@ io.on('connection', (socket) => {
     if (room.config?.gameMode === 'codenames') {
       socket.leave(code);
       codenames.depart(code, socket.id, true);
-      if (rooms[code] === room && !roomHasMinimumPlayers(room)) {
+      if (rooms[code] === room && room.status === 'PLAYING' && !roomHasMinimumPlayers(room)) {
         closeRoom(code, room, 'تم إغلاق الغرفة لأن عدد اللاعبين بقى أقل من الحد المطلوب للعب.');
       }
       return respond({ ok: true });
@@ -3579,7 +3579,7 @@ io.on('connection', (socket) => {
         maybeBeginPredictJudging(code);
       }
       
-      if (!migrated || !roomHasMinimumPlayers(room)) {
+      if (!migrated || (room.status === 'PLAYING' && !roomHasMinimumPlayers(room))) {
         closeRoom(code, room, migrated
           ? 'تم إغلاق الغرفة لأن عدد اللاعبين بقى أقل من الحد المطلوب للعب.'
           : 'تم إنهاء الغرفة بواسطة الحكم وعدم وجود لاعبين.', socket.id);
@@ -3629,7 +3629,7 @@ io.on('connection', (socket) => {
         maybeBeginPredictJudging(code);
         emitPredictState(code);
       }
-      if (!roomHasMinimumPlayers(room)) {
+      if (room.status === 'PLAYING' && !roomHasMinimumPlayers(room)) {
         closeRoom(code, room, 'تم إغلاق الغرفة لأن عدد اللاعبين بقى أقل من الحد المطلوب للعب.');
       } else {
         io.emit('public-rooms-update', getPublicRooms());
@@ -3976,7 +3976,7 @@ function normalizeArabic(text) {
           if (rooms[code] && rooms[code].hostDisconnected) {
             const migrated = migrateHost(code);
             const currentRoom = rooms[code];
-            if (!migrated || (currentRoom && !roomHasMinimumPlayers(currentRoom))) {
+            if (!migrated || (currentRoom?.status === 'PLAYING' && !roomHasMinimumPlayers(currentRoom))) {
               closeRoom(code, currentRoom, migrated
                 ? 'تم إغلاق الغرفة لأن عدد اللاعبين بقى أقل من الحد المطلوب للعب.'
                 : 'تم إغلاق الغرفة لعدم عودة الحكم وعدم وجود لاعبين.');
