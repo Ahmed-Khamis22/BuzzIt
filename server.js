@@ -221,8 +221,22 @@ function getPublicRooms() {
   return publicRooms;
 }
 
+function minimumPlayersForRoom(room) {
+  if (ALLOW_SOLO_TEST) return 1;
+  const mode = room?.config?.gameMode;
+  if (mode === 'draw') return 1;
+  if (mode === 'codenames') return 4;
+  if (mode === 'predict') return getPredictMaxPlayers(room.config);
+  return 2;
+}
+
+function roomHasMinimumPlayers(room) {
+  const activePlayers = Object.values(room?.players || {}).filter((player) => !player.disconnected).length;
+  return activePlayers >= minimumPlayersForRoom(room);
+}
+
 const ROOM_TIMER_KEYS = [
-  'buzzTimeout', 'triviaTimer', 'drawRoundTimer', 'drawDrawerDisconnectTimer', 'predictTimer', 'afkTimer',
+  'buzzTimeout', 'triviaTimer', 'drawRoundTimer', 'drawDrawerDisconnectTimer', 'predictTimer', 'afkTimer', 'minimumPlayersTimeout',
   'appealTimer', 'nextQuestionTimer', 'hostTimeout', 'inactivityTimeout',
   'codenamesTimer', 'codenamesPauseTimer', 'codenamesCleanupTimer',
 ];
@@ -239,6 +253,33 @@ function clearRoomTimers(room) {
   room.prefetching = false;
   room.prefetchPromise = null;
   room.prefetchedQuestion = null;
+}
+
+function closeRoom(code, room, message, excludedSocketId = null) {
+  if (!room || rooms[code] !== room) return false;
+  if (excludedSocketId) io.sockets.sockets.get(excludedSocketId)?.leave(code);
+  io.to(code).emit('room-closed', message);
+  const clients = io.sockets.adapter.rooms.get(code);
+  if (clients) {
+    for (const clientId of clients) io.sockets.sockets.get(clientId)?.leave(code);
+  }
+  clearRoomTimers(room);
+  delete rooms[code];
+  io.emit('public-rooms-update', getPublicRooms());
+  return true;
+}
+
+function scheduleUnderMinimumRoomClose(code, room) {
+  if (!room || room.minimumPlayersTimeout) return;
+  // Active Predict matches have their own reconnect and AI seat-replacement window.
+  if (room.config?.gameMode === 'predict' && room.status === 'PLAYING') return;
+  room.minimumPlayersTimeout = setTimeout(() => {
+    if (rooms[code] !== room) return;
+    room.minimumPlayersTimeout = null;
+    if (!roomHasMinimumPlayers(room)) {
+      closeRoom(code, room, 'تم إغلاق الغرفة لأن عدد اللاعبين بقى أقل من الحد المطلوب للعب.');
+    }
+  }, 15000);
 }
 
 async function triggerEndGame(code, payload = {}) {
@@ -342,13 +383,24 @@ async function triggerEndGame(code, payload = {}) {
 
 const fs = require('fs');
 const path = require('path');
+const sensitiveQuestionPattern = '(?:إسرائيل|اسرائيل|إسرائيلي|اسرائيلي|إسرائيلية|اسرائيلية|Israel|Israeli|تل أبيب|تل-أبيب|Tel Aviv|Tel-Aviv)';
+const sensitiveQuestionFilter = {
+  $nor: ['text', 'answer', 'choices', 'acceptedAnswers'].map((field) => ({
+    [field]: { $regex: sensitiveQuestionPattern, $options: 'i' },
+  })),
+};
+const mentionsSensitiveTopic = (value) => (Array.isArray(value) ? value : [value])
+  .some((item) => typeof item === 'string' && new RegExp(sensitiveQuestionPattern, 'i').test(item));
+const isAllowedQuestion = (question) => ![
+  question?.text, question?.answer, question?.choices, question?.acceptedAnswers,
+].some(mentionsSensitiveTopic);
 const drawWords = JSON.parse(fs.readFileSync(path.join(__dirname, 'data/drawWords.json'), 'utf8'));
 const localQuestionBank = (() => {
   try {
     const file = JSON.parse(fs.readFileSync(path.join(__dirname, 'data/questions.json'), 'utf8'));
     return Array.isArray(file)
       ? file
-        .filter((q) => q && q.text && q.answer && q.category && q.isCustomTrivia !== true)
+        .filter((q) => q && q.text && q.answer && q.category && q.isCustomTrivia !== true && isAllowedQuestion(q))
         .map((q, index) => ({ ...q, _id: q._id || `local-question-${index}` }))
       : [];
   } catch {
@@ -1212,9 +1264,9 @@ async function getVerifiedRoomProfile(userId) {
 async function buildMatchStage(room) {
   const categories = room.config?.categories || [];
   const matchStage = {
-    // User suggestions stay out of live games until an admin approves them.
-    // Missing status keeps older curated questions playable.
-    $or: [{ status: 'approved' }, { status: { $exists: false } }],
+    // Treat legacy records without a status as approved, but never select pending or rejected items.
+    status: { $in: ['approved', null] },
+    ...sensitiveQuestionFilter,
   };
 
   if (room.config?.gameMode === 'trivia' && room.config?.difficulty && room.config.difficulty !== 'mixed') {
@@ -1222,13 +1274,17 @@ async function buildMatchStage(room) {
   }
 
   let activeCategories = categories && categories.length > 0 ? categories : null;
+  const isWrittenBuzzer = room.config?.gameMode === 'buzzer' && room.config?.answerMode === 'written';
+  if (isWrittenBuzzer && activeCategories) {
+    activeCategories = activeCategories.filter((category) => category !== 'reversed-words');
+  }
   if (activeCategories && activeCategories.length > 1 && room.lastCategory) {
     const filtered = activeCategories.filter(c => c !== room.lastCategory);
     if (filtered.length > 0) activeCategories = filtered;
   }
 
   if (room.config?.gameMode === 'trivia') {
-    matchStage.isCustomTrivia = true;
+    matchStage.$or = [{ isCustomTrivia: true }, { isTriviaChoice: true }];
     if (activeCategories) matchStage.category = { $in: activeCategories };
   } else if (room.config?.gameMode === 'predict') {
     matchStage.category = 'predict-questions';
@@ -1239,6 +1295,7 @@ async function buildMatchStage(room) {
   } else {
     matchStage.isCustomTrivia = { $ne: true };
     if (activeCategories) matchStage.category = { $in: activeCategories };
+    else if (isWrittenBuzzer) matchStage.category = { $ne: 'reversed-words' };
   }
 
   // Written mode is graded by the server, so questions that only a human can
@@ -1274,7 +1331,11 @@ async function fetchOneQuestion(room) {
     }
 
     // If specific filters produced 0, try general trivia pool
-    const fallbackStage = { isTriviaChoice: true };
+    const fallbackStage = { status: { $in: ['approved', null] }, isTriviaChoice: true, ...sensitiveQuestionFilter };
+    if (room.config?.gameMode === 'buzzer' && room.config?.answerMode === 'written') {
+      fallbackStage.category = { $ne: 'reversed-words' };
+      fallbackStage.judgeEvaluated = { $ne: true };
+    }
     count = await Question.countDocuments(fallbackStage);
     if (count > 0) {
       return Question.findOne(fallbackStage)
@@ -1335,15 +1396,6 @@ function prefetchNextQuestion(code) {
   room.prefetchPromise = promise;
 }
 
-const FALLBACK_TRIVIA_QUESTIONS = [
-  { text: 'ما هي عاصمة كندا؟', choices: ['تورنتو', 'فانكوفر', 'أوتاوا', 'مونتريال'], answer: 'أوتاوا' },
-  { text: 'ما هو أكبر كوكب في المجموعة الشمسية؟', choices: ['المشتري', 'زحل', 'الأرض', 'المريخ'], answer: 'المشتري' },
-  { text: 'كم عدد أضلاع المثلث؟', choices: ['3', '4', '5', '6'], answer: '3' },
-  { text: 'ما هي عاصمة فرنسا؟', choices: ['باريس', 'ليون', 'مارسيليا', 'نيس'], answer: 'باريس' },
-  { text: 'ما هو أسرع حيوان بري في العالم؟', choices: ['الفهد', 'الأسد', 'الغزال', 'النمر'], answer: 'الفهد' },
-  { text: 'في أي قارة تقع مصر؟', choices: ['أفريقيا', 'آسيا', 'أوروبا', 'أمريكا الجنوبية'], answer: 'أفريقيا' },
-];
-
 // Predict has a distinct question format. Do not fall back to trivia when its
 // Mongo collection is empty: the host needs an open-ended prompt, not choices.
 const FALLBACK_PREDICT_QUESTIONS = [
@@ -1367,16 +1419,16 @@ function createPredictFallbackQuestion() {
   };
 }
 
-function createTriviaDesignQuestion() {
-  const item = FALLBACK_TRIVIA_QUESTIONS[Math.floor(Math.random() * FALLBACK_TRIVIA_QUESTIONS.length)];
-  return {
-    _id: `trivia-design-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    text: item.text,
-    category: 'general-knowledge',
-    choices: item.choices,
-    answer: item.answer,
-    isDesignPreview: true,
-  };
+function createTriviaDesignQuestion(room) {
+  const categories = room.config?.categories || [];
+  const wantedDifficulty = room.config?.difficulty;
+  const candidates = localQuestionBank.filter((question) => (
+    question.isTriviaChoice
+    && (!categories.length || categories.includes(question.category))
+    && (!wantedDifficulty || wantedDifficulty === 'mixed' || question.difficulty === wantedDifficulty)
+  ));
+  if (!candidates.length) return null;
+  return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
 async function fetchAndSendNextQuestion(code) {
@@ -1419,7 +1471,7 @@ async function fetchAndSendNextQuestion(code) {
   }
 
   if (!question && room.config?.gameMode === 'trivia') {
-    question = createTriviaDesignQuestion();
+    question = createTriviaDesignQuestion(room);
   }
 
   if (!question) {
@@ -3465,6 +3517,9 @@ io.on('connection', (socket) => {
     if (room.config?.gameMode === 'codenames') {
       socket.leave(code);
       codenames.depart(code, socket.id, true);
+      if (rooms[code] === room && !roomHasMinimumPlayers(room)) {
+        closeRoom(code, room, 'تم إغلاق الغرفة لأن عدد اللاعبين بقى أقل من الحد المطلوب للعب.');
+      }
       return respond({ ok: true });
     }
 
@@ -3522,21 +3577,10 @@ io.on('connection', (socket) => {
         maybeBeginPredictJudging(code);
       }
       
-      if (!migrated) {
-        // Remove the host first. Otherwise io.to(code) also sends the
-        // room-closed event back to the person who explicitly chose to leave,
-        // which makes the client show a misleading second popup after exit.
-        socket.leave(code);
-        io.to(code).emit('room-closed', 'تم إنهاء الغرفة بواسطة الحكم وعدم وجود لاعبين.');
-        const clients = io.sockets.adapter.rooms.get(code);
-        if (clients) {
-          for (const clientId of clients) {
-            const clientSocket = io.sockets.sockets.get(clientId);
-            if (clientSocket) clientSocket.leave(code);
-          }
-        }
-        clearRoomTimers(room);
-        delete rooms[code];
+      if (!migrated || !roomHasMinimumPlayers(room)) {
+        closeRoom(code, room, migrated
+          ? 'تم إغلاق الغرفة لأن عدد اللاعبين بقى أقل من الحد المطلوب للعب.'
+          : 'تم إنهاء الغرفة بواسطة الحكم وعدم وجود لاعبين.', socket.id);
       }
       socket.leave(code);
       io.emit('public-rooms-update', getPublicRooms());
@@ -3583,7 +3627,11 @@ io.on('connection', (socket) => {
         maybeBeginPredictJudging(code);
         emitPredictState(code);
       }
-      io.emit('public-rooms-update', getPublicRooms());
+      if (!roomHasMinimumPlayers(room)) {
+        closeRoom(code, room, 'تم إغلاق الغرفة لأن عدد اللاعبين بقى أقل من الحد المطلوب للعب.');
+      } else {
+        io.emit('public-rooms-update', getPublicRooms());
+      }
       respond({ ok: true });
     }
   });
@@ -3847,6 +3895,9 @@ function normalizeArabic(text) {
       const isHost = room.host === socket.id;
       if (room.config?.gameMode === 'codenames') {
         codenames.depart(code, socket.id, false);
+        if (rooms[code] === room && !roomHasMinimumPlayers(room)) {
+          scheduleUnderMinimumRoomClose(code, room);
+        }
         continue;
       }
 
@@ -3902,6 +3953,9 @@ function normalizeArabic(text) {
         // same player id, team and score instead of shrinking the round.
         const predictReplacementScheduled = schedulePredictAiReplacement(code, socket.id);
         if (!predictReplacementScheduled) maybeBeginPredictJudging(code);
+        if (!isHost && !predictReplacementScheduled && !roomHasMinimumPlayers(room)) {
+          scheduleUnderMinimumRoomClose(code, room);
+        }
       }
 
       // Checked independently of isPlayer: in trivia/draw the host is also
@@ -3919,17 +3973,11 @@ function normalizeArabic(text) {
         room.hostTimeout = setTimeout(() => {
           if (rooms[code] && rooms[code].hostDisconnected) {
             const migrated = migrateHost(code);
-            if (!migrated) {
-              io.to(code).emit('room-closed', 'تم إغلاق الغرفة لعدم عودة الحكم وعدم وجود لاعبين.');
-              const clients = io.sockets.adapter.rooms.get(code);
-              if (clients) {
-                for (const clientId of clients) {
-                  const clientSocket = io.sockets.sockets.get(clientId);
-                  if (clientSocket) clientSocket.leave(code);
-                }
-              }
-              clearRoomTimers(rooms[code]);
-              delete rooms[code];
+            const currentRoom = rooms[code];
+            if (!migrated || (currentRoom && !roomHasMinimumPlayers(currentRoom))) {
+              closeRoom(code, currentRoom, migrated
+                ? 'تم إغلاق الغرفة لأن عدد اللاعبين بقى أقل من الحد المطلوب للعب.'
+                : 'تم إغلاق الغرفة لعدم عودة الحكم وعدم وجود لاعبين.');
             }
             io.emit('public-rooms-update', getPublicRooms());
           }

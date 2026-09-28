@@ -18,6 +18,8 @@ const questionSchema = new mongoose.Schema({
   // grades on its own — otherwise every answer is rejected.
   judgeEvaluated: { type: Boolean, default: false },
   choices: { type: [String], default: [] },
+  // Source-backed multiple-choice questions are shared by trivia and buzzer modes.
+  isTriviaChoice: { type: Boolean, default: false },
   difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },
   soloStage: { type: Number, min: 1, max: 5, default: null },
   flagImage: { type: String },
@@ -29,13 +31,19 @@ const questionSchema = new mongoose.Schema({
   // Stable identity for curated game-bank records; absent on admin-authored questions.
   bankKey: { type: String, default: null },
   bankVersion: { type: Number, default: null },
+  source: { type: String, default: null },
+  sourceId: { type: String, default: null },
+  sourceUrl: { type: String, default: null },
+  sourceLicense: { type: String, default: null },
+  sourceAttribution: { type: String, default: null },
+  imageSourceUrl: { type: String, default: null },
   // UGC Support
   status: { type: String, enum: ['approved', 'pending', 'rejected'], default: 'approved' },
   submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 });
 
 // Supports the filters used when selecting the next round question.
-questionSchema.index({ status: 1, isCustomTrivia: 1, category: 1, difficulty: 1, judgeEvaluated: 1, _id: 1 });
+questionSchema.index({ status: 1, isCustomTrivia: 1, isTriviaChoice: 1, category: 1, difficulty: 1, judgeEvaluated: 1, _id: 1 });
 questionSchema.index({ category: 1, bankKey: 1 });
 
 module.exports = mongoose.model('Question', questionSchema);

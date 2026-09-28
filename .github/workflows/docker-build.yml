@@ -31,6 +31,9 @@ jobs:
             echo "==> Building new sudo docker image..."
             sudo docker build -t buzzit .
 
+            echo "==> Replacing legacy question bank with sourced questions..."
+            sudo docker run --rm --env-file .env buzzit node scripts/replaceQuestionBank.js --apply
+
             echo "==> Stopping old container (if running)..."
             sudo docker stop buzzit || true
             sudo docker rm buzzit || true
