@@ -350,11 +350,11 @@ const AD_REWARDS = {
   coins: { field: 'coins', amount: 100 },
   coins_20: { field: 'coins', amount: 100 },
   gems: { field: 'gems', amount: 2 },
+  case_file_hint: { field: 'caseFileHintTokens', amount: 1 },
+  case_file_retry: { field: 'caseFileRetryTokens', amount: 1 },
 };
 
-// Each optional reward has its own modest daily cap: three coin ads and three
-// gem ads. This makes ad inventory useful without turning either currency into
-// an unlimited faucet.
+// Each rewarded action has its own modest daily cap.
 const AD_CURRENCY_REWARD_DAILY_LIMIT = 3;
 
 router.post('/claim-ad-reward', auth, async (req, res) => {
@@ -363,7 +363,9 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
     const reward = AD_REWARDS[rewardType];
     if (!reward) return res.status(400).json({ error: 'نوع المكافأة غير صالح.' });
     // Keep the legacy coins_20 alias in the same bucket as coin rewards.
-    const rewardKey = reward.field === 'coins' ? 'coins' : 'gems';
+    const rewardKey = reward.field === 'coins' ? 'coins'
+      : reward.field === 'gems' ? 'gems'
+        : reward.field === 'caseFileRetryTokens' ? 'case_file_retry' : 'case_file_hint';
     const claimedPath = `adCurrencyRewardsClaimedByType.${rewardKey}`;
 
     const today = cairoDayKey();
@@ -391,8 +393,14 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
       { new: true },
     );
     if (!user) {
+      const rewardLabel = {
+        coins: 'الكوينز',
+        gems: 'الجواهر',
+        case_file_hint: 'تلميحات ملف القضية',
+        case_file_retry: 'إعادة محاولة ملف القضية',
+      }[rewardKey] || 'المكافآت';
       return res.status(429).json({
-        error: `استخدمت إعلانات ${rewardKey === 'coins' ? 'الكوينز' : 'الجواهر'} المتاحة لليوم. ارجع بكرة.`,
+        error: `استخدمت إعلانات ${rewardLabel} المتاحة لليوم. ارجع بكرة.`,
         code: 'DAILY_CURRENCY_AD_LIMIT',
       });
     }
@@ -421,6 +429,8 @@ router.post('/claim-ad-reward', auth, async (req, res) => {
       remainingCurrencyAdsByType: {
         coins: Math.max(0, AD_CURRENCY_REWARD_DAILY_LIMIT - (user.adCurrencyRewardsClaimedByType?.get('coins') || 0)),
         gems: Math.max(0, AD_CURRENCY_REWARD_DAILY_LIMIT - (user.adCurrencyRewardsClaimedByType?.get('gems') || 0)),
+        case_file_hint: Math.max(0, AD_CURRENCY_REWARD_DAILY_LIMIT - (user.adCurrencyRewardsClaimedByType?.get('case_file_hint') || 0)),
+        case_file_retry: Math.max(0, AD_CURRENCY_REWARD_DAILY_LIMIT - (user.adCurrencyRewardsClaimedByType?.get('case_file_retry') || 0)),
       },
     });
   } catch (err) {
