@@ -40,6 +40,7 @@ const purchasesRoutes = require('./routes/purchases');
 const adminRoutes = require('./routes/admin');
 const adsRoutes = require('./routes/ads');
 const soloGameRoutes = require('./routes/soloGameRoutes');
+const caseFileCampaignRoutes = require('./routes/caseFileCampaignRoutes');
 const Question = require('./models/Question');
 const User = require('./models/User');
 const CommunityMessage = require('./models/CommunityMessage');
@@ -89,6 +90,7 @@ app.get('/admin*', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'public', 'index.html'));
 });
 
+app.use('/api/solo-game', caseFileCampaignRoutes);
 app.use('/api/solo-game', soloGameRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);

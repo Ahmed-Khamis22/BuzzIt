@@ -7,6 +7,8 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   googleId: { type: String, unique: true, sparse: true, index: true },
   isGuest: { type: Boolean, default: false },
+  caseFileHintTokens: { type: Number, default: 0 },
+  caseFileRetryTokens: { type: Number, default: 0 },
   profileImage: { type: String, default: '' },
   bio: { type: String, default: '', trim: true },
   // New accounts start with enough coins to use the refreshed catalog.
@@ -58,6 +60,18 @@ const userSchema = new mongoose.Schema({
       currentStreak: { type: Number, default: 0 },
       bestStreak: { type: Number, default: 0 },
       points: { type: Number, default: 0 },
+    },
+    caseFile: {
+      currentStreak: { type: Number, default: 0 },
+      bestStreak: { type: Number, default: 0 },
+      points: { type: Number, default: 0 },
+      casesSolved: { type: Number, default: 0 },
+      detectiveXp: { type: Number, default: 0 },
+      solvedCaseIds: { type: [String], default: [] },
+      failedCaseIds: { type: [String], default: [] },
+      caseRecords: { type: mongoose.Schema.Types.Mixed, default: {} },
+      activeInvestigation: { type: mongoose.Schema.Types.Mixed, default: null },
+      claimedChapterRewards: { type: [String], default: [] },
     },
   },
   soloDailyUsage: {
