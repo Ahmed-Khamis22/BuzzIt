@@ -391,6 +391,23 @@ const sensitiveQuestionFilter = {
     [field]: { $regex: sensitiveQuestionPattern, $options: 'i' },
   })),
 };
+// These categories were replaced with the sourced bank. Ignore legacy shared
+// records still present in a production database so clients never fall back to
+// the old questions while a deployment's database sync is catching up.
+const SOURCED_QUESTION_CATEGORIES = [
+  'general-knowledge',
+  'egyptian-movies',
+  'flags',
+  'describe-it',
+  'word-in-song',
+  'reversed-words',
+];
+const sourcedQuestionBankFilter = {
+  $or: [
+    { category: { $nin: SOURCED_QUESTION_CATEGORIES } },
+    { bankKey: { $type: 'string' } },
+  ],
+};
 const mentionsSensitiveTopic = (value) => (Array.isArray(value) ? value : [value])
   .some((item) => typeof item === 'string' && new RegExp(sensitiveQuestionPattern, 'i').test(item));
 const isAllowedQuestion = (question) => ![
@@ -1269,6 +1286,7 @@ async function buildMatchStage(room) {
     // Treat legacy records without a status as approved, but never select pending or rejected items.
     status: { $in: ['approved', null] },
     ...sensitiveQuestionFilter,
+    $and: [sourcedQuestionBankFilter],
   };
 
   if (room.config?.gameMode === 'trivia' && room.config?.difficulty && room.config.difficulty !== 'mixed') {
@@ -1333,7 +1351,12 @@ async function fetchOneQuestion(room) {
     }
 
     // If specific filters produced 0, try general trivia pool
-    const fallbackStage = { status: { $in: ['approved', null] }, isTriviaChoice: true, ...sensitiveQuestionFilter };
+    const fallbackStage = {
+      status: { $in: ['approved', null] },
+      isTriviaChoice: true,
+      ...sensitiveQuestionFilter,
+      bankKey: { $type: 'string' },
+    };
     if (room.config?.gameMode === 'buzzer' && room.config?.answerMode === 'written') {
       fallbackStage.category = { $ne: 'reversed-words' };
       fallbackStage.judgeEvaluated = { $ne: true };
