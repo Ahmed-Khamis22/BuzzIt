@@ -26,20 +26,23 @@ const FORBIDDEN_CONTENT = /(?:إسرائيل|اسرائيل|إسرائيلي|ا�
 
 function loadAndValidateBank() {
   const questions = JSON.parse(fs.readFileSync(BANK_PATH, 'utf8'));
-  if (!Array.isArray(questions) || questions.length < 1500) {
+  if (!Array.isArray(questions) || questions.length < 600) {
     throw new Error('بنك الأسئلة غير مكتمل؛ لن يتم استبدال الأسئلة القديمة.');
   }
 
   const bankKeys = new Set();
   for (const question of questions) {
     const expectedSource = CATEGORY_SOURCES[question?.category];
+    const isCuratedPrimaryFact = ['general-knowledge', 'egyptian-movies'].includes(question?.category)
+      && question?.source === 'curated_primary_fact'
+      && Boolean(question?.sourceAttribution);
     const content = [question?.text, question?.answer, question?.choices, question?.acceptedAnswers]
       .flat(Infinity).filter((value) => typeof value === 'string').join(' ');
     if (
-      !expectedSource
+      (!expectedSource && !isCuratedPrimaryFact)
       || !question.text
       || !question.answer
-      || question.source !== expectedSource
+      || (!isCuratedPrimaryFact && question.source !== expectedSource)
       || !question.sourceUrl
       || !question.sourceLicense
       || question.status !== 'pending'
@@ -49,11 +52,20 @@ function loadAndValidateBank() {
     ) {
       throw new Error(`سجل غير صالح في بنك الأسئلة: ${question?.bankKey || '(بدون bankKey)'}`);
     }
-    if (expectedSource === 'wikidata_cc0') {
+    if (question.source === 'wikidata_cc0') {
       if (!question.isTriviaChoice || question.choices?.length !== 4 || !question.choices.includes(question.answer)) {
         throw new Error(`اختيارات غير صالحة في السؤال: ${question.bankKey}`);
       }
-    } else if (!question.sourceAttribution || question.sourceLicense !== 'CC BY-SA 4.0') {
+    } else if (question.source === 'wiktionary_arabic_swadesh') {
+      if (!question.sourceAttribution || question.sourceLicense !== 'CC BY-SA 4.0') {
+        throw new Error(`إسناد أو ترخيص ناقص في السؤال: ${question.bankKey}`);
+      }
+    } else if (isCuratedPrimaryFact) {
+      if (!question.isTriviaChoice || question.choices?.length !== 4 || !question.choices.includes(question.answer)
+        || !/^https:\/\//.test(question.sourceUrl) || !question.sourceId) {
+        throw new Error(`مرجع أو اختيارات غير صالحة في السؤال: ${question.bankKey}`);
+      }
+    } else {
       throw new Error(`إسناد أو ترخيص ناقص في السؤال: ${question.bankKey}`);
     }
     bankKeys.add(question.bankKey);

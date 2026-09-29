@@ -6,8 +6,8 @@ The preview file keeps records marked `pending`. The deployment importer validat
 
 | Category | New pending records | Source and method |
 | --- | ---: | --- |
-| `general-knowledge` | 809 | Referenced Wikidata facts about capitals and cities. Ambiguous city names were removed, malformed repeated `مدينة` prefixes were corrected, and the Surat answer was normalized to India. Questions about Jerusalem were removed. International film questions were removed to keep cinema in the Egyptian-movies category. |
-| `egyptian-movies` | 319 | Referenced Wikidata film-director facts for Egyptian films. The multi-director film `البنات والصيف` was removed. |
+| `general-knowledge` | 39 | A small, hand-written Egyptian Arabic set about animals, space, and familiar sports facts. Animal facts cite NOAA and the San Diego Zoo or Smithsonian; space facts cite NASA; sports rules and records cite IFAB, ITF, IOC, or FIFA. Old city-location and capital-heavy prompts were removed. |
+| `egyptian-movies` | 20 | Egyptian Arabic questions about familiar characters and actors in `الناظر`, `صعيدي في الجامعة الأمريكية`, and `كده رضا`. Cast references link to [ElCinema: الناظر](https://elcinema.com/work/1001525/cast), [ElCinema: صعيدي في الجامعة الأمريكية](https://elcinema.com/work/1008760/cast), and [ElCinema: كده رضا](https://elcinema.com/work/1009131/cast). Old director-trivia prompts were removed. |
 | `flags` | 144 | New country flags only; duplicates and the listed dependent territories were excluded. Myanmar uses the current `mm.png` flag image. Country names and ISO codes come from Wikidata, paired with PNG flag images from FlagCDN. The [Flagpedia download page](https://flagpedia.net/download) marks its country flags as public domain. |
 | `describe-it` | 196 | Common word targets from the Arabic Swadesh list, rendered as charades prompts. Ambiguous, rare, malformed, and function-word entries were removed. No AI-written riddles are included. |
 | `word-in-song` | 196 | Single-word prompts from the same filtered list. The bank contains no song lyrics or copied lyric excerpts. |
@@ -25,7 +25,7 @@ Other modes such as drawing, chess, and codenames do not select from the `Questi
 
 ## Preview files
 
-- `question-bank-all-categories-preview.json` — all 1,736 new pending records for the six multiplayer room categories.
+- `question-bank-all-categories-preview.json` — all 667 pending records for the six multiplayer room categories, including the refreshed general-knowledge and Egyptian-movies sets.
 - `wikidata-question-bank-preview.json` — 1,128 Wikidata general-knowledge and Egyptian-cinema records.
 - `wikidata-flags-preview.json` — flag records.
 - `wiktionary-word-games-preview.json` — word-game prompt records and attribution.
