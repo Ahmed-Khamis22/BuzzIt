@@ -251,7 +251,7 @@ function roomHasMinimumPlayers(room) {
 }
 
 const ROOM_TIMER_KEYS = [
-  'buzzTimeout', 'triviaTimer', 'drawRoundTimer', 'drawDrawerDisconnectTimer', 'predictTimer', 'afkTimer', 'minimumPlayersTimeout',
+  'buzzTimeout', 'triviaTimer', 'drawRoundTimer', 'drawDrawerDisconnectTimer', 'predictTimer', 'afkTimer',
   'appealTimer', 'nextQuestionTimer', 'hostTimeout', 'inactivityTimeout',
   'codenamesTimer', 'codenamesPauseTimer', 'codenamesCleanupTimer',
 ];
@@ -282,19 +282,6 @@ function closeRoom(code, room, message, excludedSocketId = null) {
   delete rooms[code];
   io.emit('public-rooms-update', getPublicRooms());
   return true;
-}
-
-function scheduleUnderMinimumRoomClose(code, room) {
-  if (!room || room.status !== 'PLAYING' || room.minimumPlayersTimeout) return;
-  // Active Predict matches have their own reconnect and AI seat-replacement window.
-  if (room.config?.gameMode === 'predict' && room.status === 'PLAYING') return;
-  room.minimumPlayersTimeout = setTimeout(() => {
-    if (rooms[code] !== room) return;
-    room.minimumPlayersTimeout = null;
-    if (room.status === 'PLAYING' && !roomHasMinimumPlayers(room)) {
-      closeRoom(code, room, 'تم إغلاق الغرفة لأن عدد اللاعبين بقى أقل من الحد المطلوب للعب.');
-    }
-  }, 15000);
 }
 
 async function triggerEndGame(code, payload = {}) {
@@ -499,7 +486,7 @@ function migrateHost(code) {
   logDebug(`[Host Migration] Active players count: ${activePlayers.length}`);
   
   if (activePlayers.length === 0) {
-    logDebug(`[Host Migration] No active players to migrate to. Room will be closed.`);
+    logDebug(`[Host Migration] No active players to migrate to.`);
     return false;
   }
 
@@ -3933,9 +3920,6 @@ function normalizeArabic(text) {
       const isHost = room.host === socket.id;
       if (room.config?.gameMode === 'codenames') {
         codenames.depart(code, socket.id, false);
-        if (rooms[code] === room && !roomHasMinimumPlayers(room)) {
-          scheduleUnderMinimumRoomClose(code, room);
-        }
         continue;
       }
 
@@ -3991,9 +3975,6 @@ function normalizeArabic(text) {
         // same player id, team and score instead of shrinking the round.
         const predictReplacementScheduled = schedulePredictAiReplacement(code, socket.id);
         if (!predictReplacementScheduled) maybeBeginPredictJudging(code);
-        if (!isHost && !predictReplacementScheduled && !roomHasMinimumPlayers(room)) {
-          scheduleUnderMinimumRoomClose(code, room);
-        }
       }
 
       // Checked independently of isPlayer: in trivia/draw the host is also
@@ -4011,12 +3992,7 @@ function normalizeArabic(text) {
         room.hostTimeout = setTimeout(() => {
           if (rooms[code] && rooms[code].hostDisconnected) {
             const migrated = migrateHost(code);
-            const currentRoom = rooms[code];
-            if (!migrated || (currentRoom?.status === 'PLAYING' && !roomHasMinimumPlayers(currentRoom))) {
-              closeRoom(code, currentRoom, migrated
-                ? 'تم إغلاق الغرفة لأن عدد اللاعبين بقى أقل من الحد المطلوب للعب.'
-                : 'تم إغلاق الغرفة لعدم عودة الحكم وعدم وجود لاعبين.');
-            }
+            if (!migrated) logDebug(`[Host Migration] No connected player for room ${code}; keeping room available for host reconnect.`);
             io.emit('public-rooms-update', getPublicRooms());
           }
         }, 30000); // 30 seconds
