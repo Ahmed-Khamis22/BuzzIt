@@ -49,10 +49,23 @@ const jwt = require('jsonwebtoken');
 const syncFlagQuestions = require('./services/flagQuestionSync');
 const syncQuestionCorrections = require('./services/questionCorrectionSync');
 const syncSoloGameQuestions = require('./services/soloQuestionSync');
+const {
+  loadAndValidateBank,
+  activeRecords,
+  replaceDatabaseBank,
+} = require('./scripts/replaceQuestionBank');
 
-connectDB()
-  .then(() => Promise.all([syncFlagQuestions(), syncQuestionCorrections(), syncSoloGameQuestions()]))
-  .catch((error) => console.error('Question sync failed:', error.message));
+const databaseReady = connectDB().then(async () => {
+  const { questions, bankKeys } = loadAndValidateBank();
+  const { upsertResult, deleteResult } = await replaceDatabaseBank(activeRecords(questions), bankKeys);
+  console.log(JSON.stringify({
+    questionBankSynced: questions.length,
+    inserted: upsertResult.upsertedCount,
+    updated: upsertResult.modifiedCount,
+    oldQuestionsRemoved: deleteResult.deletedCount,
+  }));
+  await Promise.all([syncFlagQuestions(), syncQuestionCorrections(), syncSoloGameQuestions()]);
+});
 
 const app = express();
 
@@ -4247,6 +4260,13 @@ function normalizeArabic(text) {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`BuzzIt running on http://localhost:${PORT}`);
-});
+databaseReady
+  .then(() => {
+    server.listen(PORT, () => {
+      console.log(`BuzzIt running on http://localhost:${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Server startup stopped because the question bank could not be synchronized:', error.message);
+    process.exit(1);
+  });

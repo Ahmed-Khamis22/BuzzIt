@@ -81,7 +81,8 @@ function replaceLocalFallback(questions) {
 
 async function replaceDatabaseBank(records, bankKeys) {
   if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI مطلوب لمزامنة بنك الأسئلة.');
-  await mongoose.connect(process.env.MONGODB_URI);
+  const ownsConnection = mongoose.connection.readyState === 0;
+  if (ownsConnection) await mongoose.connect(process.env.MONGODB_URI);
   try {
     const existing = await Question.find({ bankKey: { $in: [...bankKeys] } })
       .select('source bankKey status')
@@ -118,7 +119,7 @@ async function replaceDatabaseBank(records, bankKeys) {
 
     return { upsertResult, deleteResult };
   } finally {
-    await mongoose.disconnect();
+    if (ownsConnection) await mongoose.disconnect();
   }
 }
 
@@ -152,4 +153,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { loadAndValidateBank, activeRecords };
+module.exports = { loadAndValidateBank, activeRecords, replaceDatabaseBank };
