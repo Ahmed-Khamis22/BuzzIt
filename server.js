@@ -1357,8 +1357,15 @@ async function fetchOneQuestion(room) {
       ...sensitiveQuestionFilter,
       bankKey: { $type: 'string' },
     };
+    const fallbackCategories = activeCategories || categories;
+    if (fallbackCategories.length > 0) {
+      fallbackStage.category = { $in: fallbackCategories };
+    }
+    if (room.config?.gameMode === 'trivia' && room.config?.difficulty && room.config.difficulty !== 'mixed') {
+      fallbackStage.difficulty = room.config.difficulty;
+    }
     if (room.config?.gameMode === 'buzzer' && room.config?.answerMode === 'written') {
-      fallbackStage.category = { $ne: 'reversed-words' };
+      if (fallbackCategories.length === 0) fallbackStage.category = { $ne: 'reversed-words' };
       fallbackStage.judgeEvaluated = { $ne: true };
     }
     count = await Question.countDocuments(fallbackStage);
