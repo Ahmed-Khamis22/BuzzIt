@@ -14829,6 +14829,627 @@
     "status": "approved"
   },
   {
+    "text": "الكوالا بياكل أوراق شجر إيه في الأساس؟",
+    "category": "general-knowledge",
+    "answer": "الأوكالبتوس",
+    "acceptedAnswers": [
+      "الأوكالبتوس"
+    ],
+    "choices": [
+      "الصبار",
+      "الموز",
+      "الأوكالبتوس",
+      "الكنغر"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_040",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "San Diego Zoo Wildlife Alliance:40",
+    "sourceUrl": "https://animals.sandiegozoo.org/animals/koala",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "San Diego Zoo Wildlife Alliance",
+    "status": "approved"
+  },
+  {
+    "text": "الكوالا دب بجد ولا اسمه بس اللي بيقول كده؟",
+    "category": "general-knowledge",
+    "answer": "جرابي مش دب",
+    "acceptedAnswers": [
+      "جرابي مش دب"
+    ],
+    "choices": [
+      "دب صغير",
+      "قرد",
+      "جرابي مش دب",
+      "الكنغر"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_041",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "San Diego Zoo Wildlife Alliance:41",
+    "sourceUrl": "https://animals.sandiegozoo.org/animals/koala",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "San Diego Zoo Wildlife Alliance",
+    "status": "approved"
+  },
+  {
+    "text": "الكوالا ممكن ينام لحد كام ساعة في اليوم؟",
+    "category": "general-knowledge",
+    "answer": "حوالي 22 ساعة",
+    "acceptedAnswers": [
+      "حوالي 22 ساعة"
+    ],
+    "choices": [
+      "4 ساعات",
+      "10 ساعات",
+      "حوالي 22 ساعة",
+      "الكنغر"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_042",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "San Diego Zoo Wildlife Alliance:42",
+    "sourceUrl": "https://animals.sandiegozoo.org/animals/koala",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "San Diego Zoo Wildlife Alliance",
+    "status": "approved"
+  },
+  {
+    "text": "الكوالا صغيره بيكملوا نموهم فين بعد ما يتولدوا؟",
+    "category": "general-knowledge",
+    "answer": "في جراب الأم",
+    "acceptedAnswers": [
+      "في جراب الأم"
+    ],
+    "choices": [
+      "في العش",
+      "في الميه",
+      "في جراب الأم",
+      "الكنغر"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_043",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "San Diego Zoo Wildlife Alliance:43",
+    "sourceUrl": "https://animals.sandiegozoo.org/animals/koala",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "San Diego Zoo Wildlife Alliance",
+    "status": "approved"
+  },
+  {
+    "text": "الباندا الحمرا بتحب تاكل إيه؟",
+    "category": "general-knowledge",
+    "answer": "الخيزران",
+    "acceptedAnswers": [
+      "الخيزران"
+    ],
+    "choices": [
+      "السمك",
+      "العشب البحري",
+      "الخيزران",
+      "الكنغر"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_044",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "Smithsonian National Zoo:44",
+    "sourceUrl": "https://nationalzoo.si.edu/animals/red-panda",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "Smithsonian National Zoo",
+    "status": "approved"
+  },
+  {
+    "text": "ذيل الباندا الحمرا الكثيف بيساعدها تعمل إيه؟",
+    "category": "general-knowledge",
+    "answer": "تحافظ على توازنها",
+    "acceptedAnswers": [
+      "تحافظ على توازنها"
+    ],
+    "choices": [
+      "تطير",
+      "تحفر تحت الأرض",
+      "تحافظ على توازنها",
+      "الكنغر"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_045",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "Smithsonian National Zoo:45",
+    "sourceUrl": "https://nationalzoo.si.edu/animals/red-panda",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "Smithsonian National Zoo",
+    "status": "approved"
+  },
+  {
+    "text": "الباندا الحمرا قريبة قوي من الباندا العملاقة؟",
+    "category": "general-knowledge",
+    "answer": "لأ، مش قريبين من بعض",
+    "acceptedAnswers": [
+      "لأ، مش قريبين من بعض"
+    ],
+    "choices": [
+      "آه، نفس النوع",
+      "آه، أم وبنت",
+      "لأ، مش قريبين من بعض",
+      "الكنغر"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_046",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "Smithsonian National Zoo:46",
+    "sourceUrl": "https://nationalzoo.si.edu/animals/red-panda",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "Smithsonian National Zoo",
+    "status": "approved"
+  },
+  {
+    "text": "الباندا الحمرا بتستخدم عظمة شبه الإبهام عشان تمسك إيه؟",
+    "category": "general-knowledge",
+    "answer": "الخيزران",
+    "acceptedAnswers": [
+      "الخيزران"
+    ],
+    "choices": [
+      "الحصى",
+      "السمك",
+      "الخيزران",
+      "الكنغر"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_047",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "Smithsonian National Zoo:47",
+    "sourceUrl": "https://nationalzoo.si.edu/animals/red-panda",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "Smithsonian National Zoo",
+    "status": "approved"
+  },
+  {
+    "text": "الميركات من عيلة إيه؟",
+    "category": "general-knowledge",
+    "answer": "النمس",
+    "acceptedAnswers": [
+      "النمس"
+    ],
+    "choices": [
+      "القطط",
+      "الدببة",
+      "النمس",
+      "الثعالب"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_048",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "San Diego Zoo Wildlife Alliance:48",
+    "sourceUrl": "https://animals.sandiegozoo.org/animals/meerkat",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "San Diego Zoo Wildlife Alliance",
+    "status": "approved"
+  },
+  {
+    "text": "الميركاتس بتعيش غالبًا لوحدها ولا في مجموعات؟",
+    "category": "general-knowledge",
+    "answer": "في مجموعات",
+    "acceptedAnswers": [
+      "في مجموعات"
+    ],
+    "choices": [
+      "لوحدها طول الوقت",
+      "في مجموعات",
+      "في أزواج بس",
+      "الثعالب"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_049",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "San Diego Zoo Wildlife Alliance:49",
+    "sourceUrl": "https://animals.sandiegozoo.org/animals/meerkat",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "San Diego Zoo Wildlife Alliance",
+    "status": "approved"
+  },
+  {
+    "text": "الميركات ممكن يصطاد إيه رغم سمه؟",
+    "category": "general-knowledge",
+    "answer": "العقارب",
+    "acceptedAnswers": [
+      "العقارب"
+    ],
+    "choices": [
+      "الفيلة",
+      "الزرافات",
+      "العقارب",
+      "الثعالب"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_050",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "San Diego Zoo Wildlife Alliance:50",
+    "sourceUrl": "https://animals.sandiegozoo.org/animals/meerkat",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "San Diego Zoo Wildlife Alliance",
+    "status": "approved"
+  },
+  {
+    "text": "الميركات بيعوض الميه اللي محتاجها غالبًا منين؟",
+    "category": "general-knowledge",
+    "answer": "الأكل",
+    "acceptedAnswers": [
+      "الأكل"
+    ],
+    "choices": [
+      "الهواء",
+      "الرمل",
+      "الأكل",
+      "الثعالب"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_051",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "San Diego Zoo Wildlife Alliance:51",
+    "sourceUrl": "https://animals.sandiegozoo.org/animals/meerkat",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "San Diego Zoo Wildlife Alliance",
+    "status": "approved"
+  },
+  {
+    "text": "إيه النجم الوحيد اللي موجود في مجموعتنا الشمسية؟",
+    "category": "general-knowledge",
+    "answer": "الشمس",
+    "acceptedAnswers": [
+      "الشمس"
+    ],
+    "choices": [
+      "الشعرى اليمانية",
+      "النجم القطبي",
+      "الشمس",
+      "الأرض"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_052",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "NASA:52",
+    "sourceUrl": "https://science.nasa.gov/sun/facts/",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "NASA",
+    "status": "approved"
+  },
+  {
+    "text": "إيه اللي ماسك كواكب المجموعة الشمسية في مداراتها؟",
+    "category": "general-knowledge",
+    "answer": "جاذبية الشمس",
+    "acceptedAnswers": [
+      "جاذبية الشمس"
+    ],
+    "choices": [
+      "جاذبية القمر",
+      "الرياح",
+      "جاذبية الشمس",
+      "الأرض"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_053",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "NASA:53",
+    "sourceUrl": "https://science.nasa.gov/sun/facts/",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "NASA",
+    "status": "approved"
+  },
+  {
+    "text": "القمر اللي بنشوفه بالليل بيلف حوالين إيه؟",
+    "category": "general-knowledge",
+    "answer": "الأرض",
+    "acceptedAnswers": [
+      "الأرض"
+    ],
+    "choices": [
+      "المريخ",
+      "الشمس بس",
+      "الأرض",
+      "الزهرة"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_054",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "NASA:54",
+    "sourceUrl": "https://science.nasa.gov/moon/facts/",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "NASA",
+    "status": "approved"
+  },
+  {
+    "text": "القمر بينور من نفسه ولا بيعكس نور الشمس؟",
+    "category": "general-knowledge",
+    "answer": "بيعكس نور الشمس",
+    "acceptedAnswers": [
+      "بيعكس نور الشمس"
+    ],
+    "choices": [
+      "بينور من نفسه",
+      "بياخد نور من الأرض",
+      "بيعكس نور الشمس",
+      "المريخ"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_055",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "NASA:55",
+    "sourceUrl": "https://science.nasa.gov/moon/facts/",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "NASA",
+    "status": "approved"
+  },
+  {
+    "text": "بلوتو بيتصنف دلوقتي كوكب ولا كوكب قزم؟",
+    "category": "general-knowledge",
+    "answer": "كوكب قزم",
+    "acceptedAnswers": [
+      "كوكب قزم"
+    ],
+    "choices": [
+      "نجم",
+      "كوكب غازي",
+      "كوكب قزم",
+      "المريخ"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_056",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "NASA:56",
+    "sourceUrl": "https://science.nasa.gov/solar-system/solar-system-facts/",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "NASA",
+    "status": "approved"
+  },
+  {
+    "text": "الشمس ومجموعتنا الشمسية موجودين في مجرة إيه؟",
+    "category": "general-knowledge",
+    "answer": "درب التبانة",
+    "acceptedAnswers": [
+      "درب التبانة"
+    ],
+    "choices": [
+      "مجرة المرأة المسلسلة",
+      "مجرة المثلث",
+      "درب التبانة",
+      "المريخ"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_057",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "NASA:57",
+    "sourceUrl": "https://science.nasa.gov/solar-system/solar-system-facts/",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "NASA",
+    "status": "approved"
+  },
+  {
+    "text": "أنهي كوكبين مفيش عندهم أقمار طبيعية؟",
+    "category": "general-knowledge",
+    "answer": "عطارد والزهرة",
+    "acceptedAnswers": [
+      "عطارد والزهرة"
+    ],
+    "choices": [
+      "الأرض والمريخ",
+      "المشتري وزحل",
+      "عطارد والزهرة",
+      "المريخ"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_058",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "NASA:58",
+    "sourceUrl": "https://science.nasa.gov/solar-system/solar-system-facts/",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "NASA",
+    "status": "approved"
+  },
+  {
+    "text": "حزام الكويكبات موجود تقريبًا بين أنهي كوكبين؟",
+    "category": "general-knowledge",
+    "answer": "المريخ والمشتري",
+    "acceptedAnswers": [
+      "المريخ والمشتري"
+    ],
+    "choices": [
+      "الأرض والمريخ",
+      "زحل وأورانوس",
+      "المريخ والمشتري",
+      "المريخ"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_059",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "NASA:59",
+    "sourceUrl": "https://science.nasa.gov/solar-system/solar-system-facts/",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "NASA",
+    "status": "approved"
+  },
+  {
+    "text": "المجموعة الشمسية اتكونت من حوالي كام مليار سنة؟",
+    "category": "general-knowledge",
+    "answer": "4.6 مليار سنة",
+    "acceptedAnswers": [
+      "4.6 مليار سنة"
+    ],
+    "choices": [
+      "مليون سنة",
+      "مليار سنة واحدة",
+      "4.6 مليار سنة",
+      "المريخ"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_060",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "NASA:60",
+    "sourceUrl": "https://science.nasa.gov/solar-system/solar-system-facts/",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "NASA",
+    "status": "approved"
+  },
+  {
+    "text": "قمر جانيميد بيتبع أنهي كوكب؟",
+    "category": "general-knowledge",
+    "answer": "المشتري",
+    "acceptedAnswers": [
+      "المشتري"
+    ],
+    "choices": [
+      "الأرض",
+      "زحل",
+      "المشتري",
+      "أوروبا"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_061",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "NASA:61",
+    "sourceUrl": "https://science.nasa.gov/jupiter/jupiter-moons/ganymede/facts/",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "NASA",
+    "status": "approved"
+  },
+  {
+    "text": "أنهي كوكب مشهور بالبقعة الحمرا الكبيرة؟",
+    "category": "general-knowledge",
+    "answer": "المشتري",
+    "acceptedAnswers": [
+      "المشتري"
+    ],
+    "choices": [
+      "المريخ",
+      "الزهرة",
+      "المشتري",
+      "زحل"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "medium",
+    "bankKey": "curated_fun_062",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "NASA:62",
+    "sourceUrl": "https://science.nasa.gov/jupiter/jupiter-facts/",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "NASA",
+    "status": "approved"
+  },
+  {
     "text": "في فيلم الناظر، مين كان عامل دور عاشور؟",
     "category": "egyptian-movies",
     "answer": "علاء ولي الدين",
@@ -14849,7 +15470,7 @@
     "bankKey": "curated_egyptian_movie_001",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:40",
+    "sourceId": "ElCinema:63",
     "sourceUrl": "https://elcinema.com/work/1001525/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -14876,7 +15497,7 @@
     "bankKey": "curated_egyptian_movie_002",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:41",
+    "sourceId": "ElCinema:64",
     "sourceUrl": "https://elcinema.com/work/1001525/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -14903,7 +15524,7 @@
     "bankKey": "curated_egyptian_movie_003",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:42",
+    "sourceId": "ElCinema:65",
     "sourceUrl": "https://elcinema.com/work/1001525/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -14930,7 +15551,7 @@
     "bankKey": "curated_egyptian_movie_004",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:43",
+    "sourceId": "ElCinema:66",
     "sourceUrl": "https://elcinema.com/work/1001525/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -14957,7 +15578,7 @@
     "bankKey": "curated_egyptian_movie_005",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:44",
+    "sourceId": "ElCinema:67",
     "sourceUrl": "https://elcinema.com/work/1001525/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -14984,7 +15605,7 @@
     "bankKey": "curated_egyptian_movie_006",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:45",
+    "sourceId": "ElCinema:68",
     "sourceUrl": "https://elcinema.com/work/1008760/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -15011,7 +15632,7 @@
     "bankKey": "curated_egyptian_movie_007",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:46",
+    "sourceId": "ElCinema:69",
     "sourceUrl": "https://elcinema.com/work/1008760/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -15038,7 +15659,7 @@
     "bankKey": "curated_egyptian_movie_008",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:47",
+    "sourceId": "ElCinema:70",
     "sourceUrl": "https://elcinema.com/work/1008760/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -15065,7 +15686,7 @@
     "bankKey": "curated_egyptian_movie_009",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:48",
+    "sourceId": "ElCinema:71",
     "sourceUrl": "https://elcinema.com/work/1008760/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -15092,7 +15713,7 @@
     "bankKey": "curated_egyptian_movie_010",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:49",
+    "sourceId": "ElCinema:72",
     "sourceUrl": "https://elcinema.com/work/1008760/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -15119,7 +15740,7 @@
     "bankKey": "curated_egyptian_movie_011",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:50",
+    "sourceId": "ElCinema:73",
     "sourceUrl": "https://elcinema.com/work/1008760/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -15146,7 +15767,7 @@
     "bankKey": "curated_egyptian_movie_012",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:51",
+    "sourceId": "ElCinema:74",
     "sourceUrl": "https://elcinema.com/work/1009131/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -15173,7 +15794,7 @@
     "bankKey": "curated_egyptian_movie_013",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:52",
+    "sourceId": "ElCinema:75",
     "sourceUrl": "https://elcinema.com/work/1009131/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -15200,7 +15821,7 @@
     "bankKey": "curated_egyptian_movie_014",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:53",
+    "sourceId": "ElCinema:76",
     "sourceUrl": "https://elcinema.com/work/1009131/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -15227,7 +15848,7 @@
     "bankKey": "curated_egyptian_movie_015",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:54",
+    "sourceId": "ElCinema:77",
     "sourceUrl": "https://elcinema.com/work/1008760/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -15254,7 +15875,7 @@
     "bankKey": "curated_egyptian_movie_016",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:55",
+    "sourceId": "ElCinema:78",
     "sourceUrl": "https://elcinema.com/work/1001525/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -15281,7 +15902,7 @@
     "bankKey": "curated_egyptian_movie_017",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:56",
+    "sourceId": "ElCinema:79",
     "sourceUrl": "https://elcinema.com/work/1009131/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -15308,7 +15929,7 @@
     "bankKey": "curated_egyptian_movie_018",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:57",
+    "sourceId": "ElCinema:80",
     "sourceUrl": "https://elcinema.com/work/1001525/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -15335,7 +15956,7 @@
     "bankKey": "curated_egyptian_movie_019",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:58",
+    "sourceId": "ElCinema:81",
     "sourceUrl": "https://elcinema.com/work/1008760/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
@@ -15362,8 +15983,467 @@
     "bankKey": "curated_egyptian_movie_020",
     "bankVersion": 1,
     "source": "curated_primary_fact",
-    "sourceId": "ElCinema:59",
+    "sourceId": "ElCinema:82",
     "sourceUrl": "https://elcinema.com/work/1009131/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "في فيلم الإرهاب والكباب، مين كان عامل دور أحمد فتح الباب؟",
+    "category": "egyptian-movies",
+    "answer": "عادل إمام",
+    "acceptedAnswers": [
+      "عادل إمام"
+    ],
+    "choices": [
+      "أحمد راتب",
+      "أشرف عبدالباقي",
+      "عادل إمام",
+      "كمال الشناوي"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_021",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:83",
+    "sourceUrl": "https://elcinema.com/work/1010305/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "في الإرهاب والكباب، مين لعب دور هند؟",
+    "category": "egyptian-movies",
+    "answer": "يسرا",
+    "acceptedAnswers": [
+      "يسرا"
+    ],
+    "choices": [
+      "إنعام سالوسة",
+      "ماجدة زكي",
+      "يسرا",
+      "عادل إمام"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_022",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:84",
+    "sourceUrl": "https://elcinema.com/work/1010305/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "في الإرهاب والكباب، مين لعب دور هلال؟",
+    "category": "egyptian-movies",
+    "answer": "أشرف عبدالباقي",
+    "acceptedAnswers": [
+      "أشرف عبدالباقي"
+    ],
+    "choices": [
+      "علاء ولي الدين",
+      "أحمد راتب",
+      "أشرف عبدالباقي",
+      "يوسف داوود"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_023",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:85",
+    "sourceUrl": "https://elcinema.com/work/1010305/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "في الإرهاب والكباب، مين لعب دور سمير بسيوني؟",
+    "category": "egyptian-movies",
+    "answer": "علاء ولي الدين",
+    "acceptedAnswers": [
+      "علاء ولي الدين"
+    ],
+    "choices": [
+      "أشرف عبدالباقي",
+      "أحمد عقل",
+      "علاء ولي الدين",
+      "كمال الشناوي"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_024",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:86",
+    "sourceUrl": "https://elcinema.com/work/1010305/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "اسم شخصية يسرا في الإرهاب والكباب إيه؟",
+    "category": "egyptian-movies",
+    "answer": "هند",
+    "acceptedAnswers": [
+      "هند"
+    ],
+    "choices": [
+      "منيرة",
+      "أم محروس",
+      "هند",
+      "عبلة"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_025",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:87",
+    "sourceUrl": "https://elcinema.com/work/1010305/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "في عسل أسود، مين كان عامل دور مصري سيد العربي؟",
+    "category": "egyptian-movies",
+    "answer": "أحمد حلمي",
+    "acceptedAnswers": [
+      "أحمد حلمي"
+    ],
+    "choices": [
+      "إدوارد",
+      "لطفي لبيب",
+      "أحمد حلمي",
+      "يوسف داوود"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_026",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:88",
+    "sourceUrl": "https://elcinema.com/work/1313173/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "في عسل أسود، مين لعب دور سعيد؟",
+    "category": "egyptian-movies",
+    "answer": "إدوارد",
+    "acceptedAnswers": [
+      "إدوارد"
+    ],
+    "choices": [
+      "أحمد حلمي",
+      "يوسف داوود",
+      "إدوارد",
+      "لطفي لبيب"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_027",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:89",
+    "sourceUrl": "https://elcinema.com/work/1313173/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "في عسل أسود، مين لعب دور راضي؟",
+    "category": "egyptian-movies",
+    "answer": "لطفي لبيب",
+    "acceptedAnswers": [
+      "لطفي لبيب"
+    ],
+    "choices": [
+      "إدوارد",
+      "طارق الأمير",
+      "لطفي لبيب",
+      "أحمد حلمي"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_028",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:90",
+    "sourceUrl": "https://elcinema.com/work/1313173/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "اسم شخصية إدوارد في عسل أسود إيه؟",
+    "category": "egyptian-movies",
+    "answer": "سعيد",
+    "acceptedAnswers": [
+      "سعيد"
+    ],
+    "choices": [
+      "راضي",
+      "عم هلال",
+      "سعيد",
+      "مصري"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_029",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:91",
+    "sourceUrl": "https://elcinema.com/work/1313173/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "في فول الصين العظيم، مين لعب دور محيي الشرقاوي؟",
+    "category": "egyptian-movies",
+    "answer": "محمد هنيدي",
+    "acceptedAnswers": [
+      "محمد هنيدي"
+    ],
+    "choices": [
+      "حجاج عبدالعظيم",
+      "سامي سرحان",
+      "محمد هنيدي",
+      "سليمان عيد"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_030",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:92",
+    "sourceUrl": "https://elcinema.com/work/1002068/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "اسم شخصية محمد هنيدي في فول الصين العظيم إيه؟",
+    "category": "egyptian-movies",
+    "answer": "محيي الشرقاوي",
+    "acceptedAnswers": [
+      "محيي الشرقاوي"
+    ],
+    "choices": [
+      "جابر الشرقاوي",
+      "زينهم الشرقاوي",
+      "محيي الشرقاوي",
+      "فاروق"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_031",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:93",
+    "sourceUrl": "https://elcinema.com/work/1002068/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "في فول الصين العظيم، مين لعب دور جابر الشرقاوي؟",
+    "category": "egyptian-movies",
+    "answer": "سامي سرحان",
+    "acceptedAnswers": [
+      "سامي سرحان"
+    ],
+    "choices": [
+      "محمد هنيدي",
+      "سليمان عيد",
+      "سامي سرحان",
+      "سعيد طرابيك"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_032",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:94",
+    "sourceUrl": "https://elcinema.com/work/1002068/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "في فول الصين العظيم، مين لعب دور زينهم؟",
+    "category": "egyptian-movies",
+    "answer": "حجاج عبدالعظيم",
+    "acceptedAnswers": [
+      "حجاج عبدالعظيم"
+    ],
+    "choices": [
+      "ضياء الميرغني",
+      "محمد شومان",
+      "حجاج عبدالعظيم",
+      "سامي سرحان"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_033",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:95",
+    "sourceUrl": "https://elcinema.com/work/1002068/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "في فول الصين العظيم، مين لعب دور عبده؟",
+    "category": "egyptian-movies",
+    "answer": "سليمان عيد",
+    "acceptedAnswers": [
+      "سليمان عيد"
+    ],
+    "choices": [
+      "حجاج عبدالعظيم",
+      "محمد شومان",
+      "سليمان عيد",
+      "محمد هنيدي"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_034",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:96",
+    "sourceUrl": "https://elcinema.com/work/1002068/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "أنهي فيلم جمع أحمد حلمي وإدوارد؟",
+    "category": "egyptian-movies",
+    "answer": "عسل أسود",
+    "acceptedAnswers": [
+      "عسل أسود"
+    ],
+    "choices": [
+      "الناظر",
+      "الإرهاب والكباب",
+      "عسل أسود",
+      "فول الصين العظيم"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_035",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:97",
+    "sourceUrl": "https://elcinema.com/work/1313173/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "أنهي فيلم من دول ظهر فيه علاء ولي الدين وأشرف عبدالباقي؟",
+    "category": "egyptian-movies",
+    "answer": "الإرهاب والكباب",
+    "acceptedAnswers": [
+      "الإرهاب والكباب"
+    ],
+    "choices": [
+      "عسل أسود",
+      "الناظر",
+      "الإرهاب والكباب",
+      "فول الصين العظيم"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_036",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:98",
+    "sourceUrl": "https://elcinema.com/work/1010305/cast",
+    "sourceLicense": "Fact independently worded; reference linked",
+    "sourceAttribution": "ElCinema",
+    "status": "approved"
+  },
+  {
+    "text": "أنهي فيلم من دول بطله محمد هنيدي؟",
+    "category": "egyptian-movies",
+    "answer": "فول الصين العظيم",
+    "acceptedAnswers": [
+      "فول الصين العظيم"
+    ],
+    "choices": [
+      "عسل أسود",
+      "الإرهاب والكباب",
+      "فول الصين العظيم",
+      "كده رضا"
+    ],
+    "isTriviaChoice": true,
+    "isCustomTrivia": false,
+    "judgeMode": "closed",
+    "judgeEvaluated": false,
+    "difficulty": "easy",
+    "bankKey": "curated_egyptian_movie_037",
+    "bankVersion": 1,
+    "source": "curated_primary_fact",
+    "sourceId": "ElCinema:99",
+    "sourceUrl": "https://elcinema.com/work/1002068/cast",
     "sourceLicense": "Fact independently worded; reference linked",
     "sourceAttribution": "ElCinema",
     "status": "approved"
