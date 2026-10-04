@@ -1,5 +1,4 @@
 const crypto = require('crypto');
-const mongoose = require('mongoose');
 const express = require('express');
 const { rateLimit } = require('express-rate-limit');
 
@@ -41,6 +40,8 @@ const recentTenByTenSecretsByUser = new Map();
 const triviaStreakChallenges = new Map();
 const recentTriviaStreakQuestions = new Map();
 const triviaStreakCategoryRotations = new Map();
+let triviaStreakQuestionPoolCache = null;
+let triviaStreakQuestionPoolLoad = null;
 const RECENT_SECRET_HISTORY_MAX = 199;
 const RECENT_SECRET_HISTORY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 // A player should never lose AI in the middle of a long 10×10 match. Limit
@@ -59,6 +60,10 @@ function isUsableTriviaStreakQuestion(question) {
     && question.choices.every((choice) => Array.from(String(choice).trim()).length <= MAX_TRIVIA_STREAK_CHOICE_LENGTH));
 }
 
+function triviaStreakQuestionKey(question) {
+  return normalizeArabic(question?.text || '').replace(/\s+/g, '');
+}
+
 function shuffleTriviaStreakOptions(options) {
   const shuffled = [...options];
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
@@ -75,48 +80,76 @@ function pruneTriviaStreakChallenges() {
   }
 }
 
+async function getTriviaStreakQuestionPool() {
+  const cacheIsFresh = triviaStreakQuestionPoolCache
+    && Date.now() - triviaStreakQuestionPoolCache.loadedAt < 5 * 60 * 1000;
+  if (cacheIsFresh) return triviaStreakQuestionPoolCache;
+  if (triviaStreakQuestionPoolLoad) return triviaStreakQuestionPoolLoad;
+
+  triviaStreakQuestionPoolLoad = Question.find({ status: 'approved', isTriviaChoice: true })
+    .select('_id text answer choices difficulty category flagImage image')
+    .lean()
+    .then((records) => {
+      const byCategory = new Map();
+      const seenQuestionKeys = new Set();
+      for (const question of records) {
+        if (!question.category || !isUsableTriviaStreakQuestion(question)) continue;
+        const key = triviaStreakQuestionKey(question);
+        if (!key || seenQuestionKeys.has(key)) continue;
+        seenQuestionKeys.add(key);
+        if (!byCategory.has(question.category)) byCategory.set(question.category, []);
+        byCategory.get(question.category).push(question);
+      }
+      triviaStreakQuestionPoolCache = {
+        loadedAt: Date.now(),
+        byCategory,
+        categories: [...byCategory.keys()].sort(),
+      };
+      return triviaStreakQuestionPoolCache;
+    })
+    .finally(() => { triviaStreakQuestionPoolLoad = null; });
+  return triviaStreakQuestionPoolLoad;
+}
+
 async function createTriviaStreakQuestion(userId, excludedQuestionIds = []) {
+  const pool = await getTriviaStreakQuestionPool();
+  if (!pool.categories.length) return null;
   const userKey = String(userId);
   const recent = recentTriviaStreakQuestions.get(userKey) || [];
   const excluded = new Set([...recent, ...excludedQuestionIds.map(String)]);
-  const filter = { status: 'approved', isTriviaChoice: true, choices: { $type: 'array', $size: 4 } };
-  let categories = await Question.distinct('category', filter);
-  categories = categories.filter(Boolean).sort();
-  if (!categories.length) return null;
-
   let rotation = triviaStreakCategoryRotations.get(userKey);
   if (!rotation || rotation.index >= rotation.categories.length) {
-    const shuffled = shuffleTriviaStreakOptions(categories);
+    const shuffled = shuffleTriviaStreakOptions(pool.categories);
     if (shuffled.length > 1 && rotation?.lastCategory === shuffled[0]) [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
     rotation = { categories: shuffled, index: 0, lastCategory: rotation?.lastCategory || null };
   }
-  const category = rotation.categories[rotation.index];
-  const excludedIds = [...excluded].filter((id) => mongoose.Types.ObjectId.isValid(id)).map((id) => new mongoose.Types.ObjectId(id));
-  const sample = async (ids) => Question.aggregate([
-    { $match: { ...filter, category, ...(ids.length ? { _id: { $nin: ids } } : {}) } },
-    { $sample: { size: 100 } },
-    { $project: { _id: 1, text: 1, answer: 1, choices: 1, difficulty: 1, category: 1, flagImage: 1, image: 1 } },
-  ]);
-  let candidates = (await sample(excludedIds)).filter(isUsableTriviaStreakQuestion);
-  if (!candidates.length && excludedIds.length) candidates = (await sample([])).filter(isUsableTriviaStreakQuestion);
-  if (!candidates.length) {
-    // Try the remaining categories before reporting an empty bank. One category
-    // may contain only malformed legacy records while the others are usable.
-    for (const fallbackCategory of categories.filter((item) => item !== category)) {
-      candidates = (await Question.aggregate([
-        { $match: { ...filter, category: fallbackCategory } }, { $sample: { size: 100 } },
-        { $project: { _id: 1, text: 1, answer: 1, choices: 1, difficulty: 1, category: 1, flagImage: 1, image: 1 } },
-      ])).filter(isUsableTriviaStreakQuestion);
-      if (candidates.length) break;
-    }
-  }
-  if (!candidates.length) return null;
 
-  const question = candidates[Math.floor(Math.random() * candidates.length)];
+  let question = null;
+  let selectedCategoryIndex = rotation.index;
+  for (let offset = 0; offset < rotation.categories.length; offset += 1) {
+    const index = (rotation.index + offset) % rotation.categories.length;
+    const category = rotation.categories[index];
+    const choices = (pool.byCategory.get(category) || []).filter((item) => !excluded.has(String(item._id)));
+    if (!choices.length) continue;
+    question = choices[Math.floor(Math.random() * choices.length)];
+    selectedCategoryIndex = index;
+    break;
+  }
+  if (!question) {
+    // Every usable question in this process has appeared recently. Start a
+    // fresh cycle, while keeping the category order varied.
+    excluded.clear();
+    const category = rotation.categories[rotation.index % rotation.categories.length];
+    const choices = pool.byCategory.get(category) || [];
+    if (!choices.length) return null;
+    question = choices[Math.floor(Math.random() * choices.length)];
+    selectedCategoryIndex = rotation.index % rotation.categories.length;
+  }
+
   rotation.lastCategory = question.category;
-  rotation.index += 1;
+  rotation.index = selectedCategoryIndex + 1;
   triviaStreakCategoryRotations.set(userKey, rotation);
-  recentTriviaStreakQuestions.set(userKey, [...recent, String(question._id)].slice(-10));
+  recentTriviaStreakQuestions.set(userKey, [...recent, String(question._id)].slice(-40));
   const options = shuffleTriviaStreakOptions(question.choices);
   const challengeId = crypto.randomBytes(18).toString('hex');
   triviaStreakChallenges.set(challengeId, {
