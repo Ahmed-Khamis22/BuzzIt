@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const express = require('express');
 const { rateLimit } = require('express-rate-limit');
 
@@ -37,6 +38,9 @@ const activeChallenges = new Map();
 const lastForbiddenByUserAndQuestion = new Map();
 const tenByTenSessions = new Map();
 const recentTenByTenSecretsByUser = new Map();
+const triviaStreakChallenges = new Map();
+const recentTriviaStreakQuestions = new Map();
+const triviaStreakCategoryRotations = new Map();
 const RECENT_SECRET_HISTORY_MAX = 199;
 const RECENT_SECRET_HISTORY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 // A player should never lose AI in the middle of a long 10×10 match. Limit
@@ -45,6 +49,87 @@ const RECENT_SECRET_HISTORY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const TEN_BY_TEN_DAILY_GAME_LIMIT = Math.max(1, Number(process.env.TEN_BY_TEN_DAILY_GAME_LIMIT) || 3);
 const TEN_BY_TEN_MAX_ACTIONS = Math.max(80, Number(process.env.TEN_BY_TEN_MAX_ACTIONS) || 120);
 const DONT_SAY_MY_WORD_DAILY_GAME_LIMIT = Math.max(1, Number(process.env.DONT_SAY_MY_WORD_DAILY_GAME_LIMIT) || 3);
+const TRIVIA_STREAK_TTL_MS = 90 * 60 * 1000;
+const MAX_TRIVIA_STREAK_CHOICE_LENGTH = 22;
+const TRIVIA_STREAK_REPORT_REASONS = new Set(['wrong_answer', 'unclear_question', 'bad_choices', 'duplicate', 'other']);
+
+function isUsableTriviaStreakQuestion(question) {
+  return Boolean(question?.text && question?.answer && Array.isArray(question.choices)
+    && question.choices.length === 4 && question.choices.includes(question.answer)
+    && question.choices.every((choice) => Array.from(String(choice).trim()).length <= MAX_TRIVIA_STREAK_CHOICE_LENGTH));
+}
+
+function shuffleTriviaStreakOptions(options) {
+  const shuffled = [...options];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
+function pruneTriviaStreakChallenges() {
+  const now = Date.now();
+  for (const [id, challenge] of triviaStreakChallenges.entries()) {
+    if (challenge.expiresAt <= now) triviaStreakChallenges.delete(id);
+  }
+}
+
+async function createTriviaStreakQuestion(userId, excludedQuestionIds = []) {
+  const userKey = String(userId);
+  const recent = recentTriviaStreakQuestions.get(userKey) || [];
+  const excluded = new Set([...recent, ...excludedQuestionIds.map(String)]);
+  const filter = { status: 'approved', isTriviaChoice: true, choices: { $type: 'array', $size: 4 } };
+  let categories = await Question.distinct('category', filter);
+  categories = categories.filter(Boolean).sort();
+  if (!categories.length) return null;
+
+  let rotation = triviaStreakCategoryRotations.get(userKey);
+  if (!rotation || rotation.index >= rotation.categories.length) {
+    const shuffled = shuffleTriviaStreakOptions(categories);
+    if (shuffled.length > 1 && rotation?.lastCategory === shuffled[0]) [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
+    rotation = { categories: shuffled, index: 0, lastCategory: rotation?.lastCategory || null };
+  }
+  const category = rotation.categories[rotation.index];
+  const excludedIds = [...excluded].filter((id) => mongoose.Types.ObjectId.isValid(id)).map((id) => new mongoose.Types.ObjectId(id));
+  const sample = async (ids) => Question.aggregate([
+    { $match: { ...filter, category, ...(ids.length ? { _id: { $nin: ids } } : {}) } },
+    { $sample: { size: 100 } },
+    { $project: { _id: 1, text: 1, answer: 1, choices: 1, difficulty: 1, category: 1, flagImage: 1, image: 1 } },
+  ]);
+  let candidates = (await sample(excludedIds)).filter(isUsableTriviaStreakQuestion);
+  if (!candidates.length && excludedIds.length) candidates = (await sample([])).filter(isUsableTriviaStreakQuestion);
+  if (!candidates.length) {
+    // Try the remaining categories before reporting an empty bank. One category
+    // may contain only malformed legacy records while the others are usable.
+    for (const fallbackCategory of categories.filter((item) => item !== category)) {
+      candidates = (await Question.aggregate([
+        { $match: { ...filter, category: fallbackCategory } }, { $sample: { size: 100 } },
+        { $project: { _id: 1, text: 1, answer: 1, choices: 1, difficulty: 1, category: 1, flagImage: 1, image: 1 } },
+      ])).filter(isUsableTriviaStreakQuestion);
+      if (candidates.length) break;
+    }
+  }
+  if (!candidates.length) return null;
+
+  const question = candidates[Math.floor(Math.random() * candidates.length)];
+  rotation.lastCategory = question.category;
+  rotation.index += 1;
+  triviaStreakCategoryRotations.set(userKey, rotation);
+  recentTriviaStreakQuestions.set(userKey, [...recent, String(question._id)].slice(-10));
+  const options = shuffleTriviaStreakOptions(question.choices);
+  const challengeId = crypto.randomBytes(18).toString('hex');
+  triviaStreakChallenges.set(challengeId, {
+    userId: userKey, questionId: String(question._id), answer: question.answer, options,
+    status: 'active', answerDeadlineAt: Date.now() + 10_000, expiresAt: Date.now() + TRIVIA_STREAK_TTL_MS,
+  });
+  return {
+    challengeId, questionId: String(question._id), reportable: true,
+    text: question.text, options, category: question.category,
+    flagImage: question.flagImage || null, image: question.image || null,
+    difficulty: question.difficulty || 'medium',
+  };
+}
 
 // The database bank is the primary source. This embedded bank keeps the solo
 // game playable while a fresh deployment is still syncing Mongo questions.
@@ -398,6 +483,135 @@ router.get('/dont-say-my-word/leaderboard', auth, async (req, res) => {
     })));
   } catch (error) {
     return res.status(500).json({ error: 'STREAK_LEADERBOARD_FAILED' });
+  }
+});
+
+// Endless multiple-choice trivia streak; answers remain server-side.
+router.post('/trivia-streak/start', auth, async (req, res) => {
+  try {
+    pruneTriviaStreakChallenges();
+    for (const [id, challenge] of triviaStreakChallenges.entries()) {
+      if (challenge.userId === String(req.userId)) triviaStreakChallenges.delete(id);
+    }
+    await User.updateOne({ _id: req.userId }, { $set: { 'soloStats.triviaStreak.currentStreak': 0 } });
+    const question = await createTriviaStreakQuestion(req.userId);
+    if (!question) return res.status(404).json({ error: 'NO_TRIVIA_STREAK_QUESTIONS', message: 'مفيش أسئلة متاحة دلوقتي.' });
+    const user = await User.findById(req.userId).select('soloStats.triviaStreak').lean();
+    const stats = user?.soloStats?.triviaStreak || {};
+    return res.json({ question, stats: { currentStreak: 0, bestStreak: Number(stats.bestStreak) || 0 } });
+  } catch (error) {
+    console.error('[trivia-streak-start]', error.message);
+    return res.status(500).json({ error: 'TRIVIA_STREAK_START_FAILED' });
+  }
+});
+
+router.post('/trivia-streak/answer', auth, async (req, res) => {
+  pruneTriviaStreakChallenges();
+  const challengeId = String(req.body?.challengeId || '');
+  const optionIndex = Number(req.body?.optionIndex);
+  const challenge = triviaStreakChallenges.get(challengeId);
+  if (!challenge || challenge.userId !== String(req.userId)) return res.status(404).json({ error: 'TRIVIA_STREAK_QUESTION_NOT_FOUND' });
+  if (challenge.status !== 'active' || !Number.isInteger(optionIndex) || optionIndex < -1 || optionIndex > 3) {
+    return res.status(400).json({ error: 'INVALID_TRIVIA_STREAK_ANSWER' });
+  }
+  try {
+    const timedOut = optionIndex === -1 || Date.now() > challenge.answerDeadlineAt + 2_000;
+    const correct = !timedOut && challenge.options[optionIndex] === challenge.answer;
+    challenge.status = correct ? 'correct' : 'failed';
+    const user = await User.findById(req.userId).select('soloStats.triviaStreak xp').lean();
+    if (!user) return res.status(404).json({ error: 'USER_NOT_FOUND' });
+    const stored = user.soloStats?.triviaStreak || {};
+    const currentStreak = correct ? (Number(stored.currentStreak) || 0) + 1 : Number(stored.currentStreak) || 0;
+    const bestStreak = Math.max(Number(stored.bestStreak) || 0, currentStreak);
+    const xpEarned = correct ? 2 : 0;
+    const xp = (Number(user.xp) || 0) + xpEarned;
+    await User.updateOne({ _id: req.userId }, { $set: {
+      'soloStats.triviaStreak.currentStreak': currentStreak,
+      'soloStats.triviaStreak.bestStreak': bestStreak,
+      ...(correct ? { xp, level: calculateLevel(xp) } : {}),
+    } });
+    return res.json({ correct, timedOut, correctAnswer: challenge.answer, currentStreak, bestStreak, xpEarned });
+  } catch (error) {
+    challenge.status = 'active';
+    console.error('[trivia-streak-answer]', error.message);
+    return res.status(500).json({ error: 'TRIVIA_STREAK_ANSWER_FAILED' });
+  }
+});
+
+router.post('/trivia-streak/continue', auth, async (req, res) => {
+  pruneTriviaStreakChallenges();
+  const challengeId = String(req.body?.challengeId || '');
+  const previous = triviaStreakChallenges.get(challengeId);
+  if (!previous || previous.userId !== String(req.userId)) return res.status(400).json({ error: 'TRIVIA_STREAK_CONTINUE_NOT_AVAILABLE' });
+  if (previous.status === 'continued' && previous.nextQuestion) return res.json(previous.nextQuestion);
+  if (!['failed', 'correct'].includes(previous.status)) return res.status(400).json({ error: 'TRIVIA_STREAK_CONTINUE_NOT_AVAILABLE' });
+  try {
+    const nextQuestion = await createTriviaStreakQuestion(req.userId, [previous.questionId]);
+    if (!nextQuestion) return res.status(404).json({ error: 'NO_TRIVIA_STREAK_QUESTIONS', message: 'مفيش أسئلة متاحة دلوقتي.' });
+    previous.status = 'continued';
+    previous.nextQuestion = nextQuestion;
+    return res.json(nextQuestion);
+  } catch (error) {
+    console.error('[trivia-streak-continue]', error.message);
+    return res.status(500).json({ error: 'TRIVIA_STREAK_CONTINUE_FAILED' });
+  }
+});
+
+router.post('/trivia-streak/end', auth, async (req, res) => {
+  const challenge = triviaStreakChallenges.get(String(req.body?.challengeId || ''));
+  if (!challenge || challenge.userId !== String(req.userId) || challenge.status !== 'failed') {
+    return res.status(400).json({ error: 'TRIVIA_STREAK_END_NOT_AVAILABLE' });
+  }
+  challenge.status = 'ended';
+  try {
+    await User.updateOne({ _id: req.userId }, { $set: { 'soloStats.triviaStreak.currentStreak': 0 } });
+    const user = await User.findById(req.userId).select('soloStats.triviaStreak').lean();
+    return res.json({ currentStreak: 0, bestStreak: Number(user?.soloStats?.triviaStreak?.bestStreak) || 0 });
+  } catch (error) {
+    console.error('[trivia-streak-end]', error.message);
+    return res.status(500).json({ error: 'TRIVIA_STREAK_END_FAILED' });
+  }
+});
+
+router.post('/trivia-streak/report', auth, async (req, res) => {
+  pruneTriviaStreakChallenges();
+  const challenge = triviaStreakChallenges.get(String(req.body?.challengeId || ''));
+  if (!challenge || challenge.userId !== String(req.userId)) return res.status(404).json({ error: 'TRIVIA_STREAK_QUESTION_NOT_FOUND' });
+  const reason = String(req.body?.reason || '').trim();
+  const details = String(req.body?.details || '').trim();
+  if (!TRIVIA_STREAK_REPORT_REASONS.has(reason) || details.length > 300) return res.status(400).json({ error: 'INVALID_TRIVIA_STREAK_REPORT' });
+  try {
+    const question = await Question.findById(challenge.questionId);
+    if (!question) return res.status(404).json({ error: 'السؤال غير موجود.' });
+    if (question.reportedBy.some((id) => String(id) === String(req.userId))) return res.status(409).json({ error: 'أبلغت عن هذا السؤال بالفعل.' });
+    question.reportedBy.push(req.userId);
+    question.reportCount += 1;
+    question.reports.push({ user: req.userId, reason, details });
+    await question.save();
+    return res.json({ success: true, reportCount: question.reportCount });
+  } catch (error) {
+    console.error('[trivia-streak-report]', error.message);
+    return res.status(500).json({ error: 'TRIVIA_STREAK_REPORT_FAILED' });
+  }
+});
+
+router.get('/trivia-streak/leaderboard', auth, async (req, res) => {
+  try {
+    const players = await User.find({ 'soloStats.triviaStreak.bestStreak': { $gt: 0 } })
+      .select('username soloStats.triviaStreak.bestStreak equippedItems.avatar equippedItems.border')
+      .sort({ 'soloStats.triviaStreak.bestStreak': -1, _id: 1 })
+      .limit(50)
+      .populate({ path: 'equippedItems.avatar', select: 'name imageUrl price type' })
+      .populate({ path: 'equippedItems.border', select: 'name imageUrl price type' })
+      .lean();
+    return res.json(players.map((player, index) => ({
+      rank: index + 1, userId: player._id, username: player.username,
+      bestStreak: Number(player.soloStats?.triviaStreak?.bestStreak) || 0,
+      equippedItems: player.equippedItems || {},
+    })));
+  } catch (error) {
+    console.error('[trivia-streak-leaderboard]', error.message);
+    return res.status(500).json({ error: 'TRIVIA_STREAK_LEADERBOARD_FAILED' });
   }
 });
 

@@ -28,6 +28,12 @@ const questionSchema = new mongoose.Schema({
   // "الإبلاغ عن السؤال" — one report per user so a single player can't spam it.
   reportCount: { type: Number, default: 0 },
   reportedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  reports: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    reason: { type: String, required: true, trim: true, maxlength: 40 },
+    details: { type: String, trim: true, maxlength: 300, default: '' },
+    createdAt: { type: Date, default: Date.now },
+  }],
   // Stable identity for curated game-bank records; absent on admin-authored questions.
   bankKey: { type: String, default: null },
   bankVersion: { type: Number, default: null },

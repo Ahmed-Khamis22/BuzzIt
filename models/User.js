@@ -61,6 +61,10 @@ const userSchema = new mongoose.Schema({
       bestStreak: { type: Number, default: 0 },
       points: { type: Number, default: 0 },
     },
+    triviaStreak: {
+      currentStreak: { type: Number, default: 0 },
+      bestStreak: { type: Number, default: 0 },
+    },
     caseFile: {
       currentStreak: { type: Number, default: 0 },
       bestStreak: { type: Number, default: 0 },
