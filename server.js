@@ -1467,10 +1467,10 @@ async function fetchAndSendNextQuestion(code) {
   const room = rooms[code];
   if (!room) return false;
 
-  // A very fast Predict host can advance before the background prefetch
-  // finishes. Reuse that in-flight request; starting a second query from the
-  // same used-question snapshot can select the same question twice in a row.
-  if (room.config?.gameMode === 'predict' && room.prefetching && room.prefetchPromise) {
+  // A fast question advance can race with the background prefetch in every
+  // question mode. Wait for it so a live request cannot select the same
+  // question from the same used-question snapshot.
+  if (room.prefetching && room.prefetchPromise) {
     await room.prefetchPromise;
     if (rooms[code] !== room || room.status !== 'PLAYING') return false;
   }
