@@ -2,6 +2,7 @@ const express = require('express');
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 const { calculateLevel } = require('../services/gameService');
+const { recordSeasonPoints } = require('../services/seasonService');
 const { calculateCaseStars } = require('../services/caseFileLogic');
 const { CHAPTERS, findCase, publicCase, publicCampaign } = require('../services/caseFileBank');
 
@@ -324,6 +325,9 @@ router.post('/case-file/accuse', auth, async (req, res) => {
     // improvements are persisted on both first clears and replays.
     user.markModified('soloStats.caseFile.caseRecords');
     await user.save();
+    if (xpEarned > 0) {
+      try { await recordSeasonPoints(req.userId, xpEarned); } catch (_) {}
+    }
     return res.json(response);
   } catch (error) {
     return res.status(500).json({ error: 'CASE_FILE_ACCUSATION_FAILED' });

@@ -563,6 +563,9 @@ router.post('/trivia-streak/answer', auth, async (req, res) => {
       'soloStats.triviaStreak.bestStreak': bestStreak,
       ...(correct ? { xp, level: calculateLevel(xp) } : {}),
     } });
+    if (xpEarned > 0) {
+      try { await recordSeasonPoints(req.userId, xpEarned); } catch (_) {}
+    }
     return res.json({ correct, timedOut, correctAnswer: challenge.answer, currentStreak, bestStreak, xpEarned });
   } catch (error) {
     challenge.status = 'active';

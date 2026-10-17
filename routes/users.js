@@ -1,6 +1,8 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const GameHistory = require('../models/GameHistory');
+const SeasonAward = require('../models/SeasonAward');
 const auth = require('../middleware/auth');
 const { TASKS: DAILY_TASKS, resetDailyTasksIfStale, getDailyTasksState } = require('../services/dailyTasks');
 const { consumeAdView } = require('../services/adRewards');
@@ -122,6 +124,98 @@ router.get('/leaderboard', async (req, res) => {
       ? await legacyLeaderboardEntries(req, { skip, limit: limitNum })
       : await seasonLeaderboardEntries(req, { seasonId: season._id, skip, limit: limitNum });
     res.json({ entries, season: serializeSeason(season) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/season-awards/pending', auth, async (req, res) => {
+  try {
+    const season = await getActiveSeason();
+    const user = await User.findById(req.userId).select('claimedSeasonAwardIds claimedSeasonIds').lean();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const claimedIds = user.claimedSeasonAwardIds || [];
+    if (claimedIds.length) {
+      await SeasonAward.updateMany(
+        { userId: req.userId, _id: { $in: claimedIds }, claimedAt: null },
+        { $set: { claimedAt: new Date() } }
+      );
+    }
+    const claimedSeasonIds = user.claimedSeasonIds || [];
+    if (claimedSeasonIds.length) {
+      await SeasonAward.updateMany(
+        { userId: req.userId, seasonId: { $in: claimedSeasonIds }, claimedAt: null },
+        { $set: { claimedAt: new Date() } }
+      );
+    }
+
+    const awards = await SeasonAward.find({ userId: req.userId, claimedAt: null })
+      .sort({ seasonNumber: 1, rank: 1 })
+      .select('seasonId seasonNumber username rank points coins gems badgeId createdAt')
+      .lean();
+    res.json({ awards, season: serializeSeason(season) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/season-awards/:awardId/claim', auth, async (req, res) => {
+  try {
+    await getActiveSeason();
+    if (!mongoose.isValidObjectId(req.params.awardId)) {
+      return res.status(400).json({ error: 'Invalid season award' });
+    }
+
+    const award = await SeasonAward.findOne({ _id: req.params.awardId, userId: req.userId }).lean();
+    if (!award) return res.status(404).json({ error: 'Season award not found' });
+
+    const currentUser = await User.findById(req.userId).select('claimedSeasonAwardIds claimedSeasonIds').lean();
+    if (!currentUser) return res.status(404).json({ error: 'User not found' });
+    const alreadyClaimed = (currentUser.claimedSeasonAwardIds || [])
+      .some((id) => String(id) === String(award._id))
+      || (currentUser.claimedSeasonIds || []).some((id) => String(id) === String(award.seasonId));
+    if (award.claimedAt || alreadyClaimed) {
+      if (!award.claimedAt) {
+        await SeasonAward.updateOne({ _id: award._id, claimedAt: null }, { $set: { claimedAt: new Date() } });
+      }
+      const wallet = await User.findById(req.userId).select('coins gems').lean();
+      return res.json({ success: true, alreadyClaimed: true, award, coins: wallet?.coins, gems: wallet?.gems });
+    }
+
+    const now = new Date();
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: req.userId, claimedSeasonIds: { $ne: award.seasonId } },
+      {
+        $inc: { coins: award.coins, gems: award.gems },
+        $addToSet: {
+          claimedSeasonAwardIds: award._id,
+          claimedSeasonIds: award.seasonId,
+          seasonBadges: {
+            awardId: award._id,
+            seasonId: award.seasonId,
+            seasonNumber: award.seasonNumber,
+            rank: award.rank,
+            badgeId: award.badgeId,
+            awardedAt: now,
+          },
+        },
+      },
+      { new: true, select: 'coins gems' }
+    );
+
+    if (!updatedUser) {
+      const wallet = await User.findById(req.userId).select('coins gems claimedSeasonAwardIds claimedSeasonIds').lean();
+      if (!wallet) return res.status(404).json({ error: 'User not found' });
+      const wasClaimed = (wallet.claimedSeasonAwardIds || []).some((id) => String(id) === String(award._id))
+        || (wallet.claimedSeasonIds || []).some((id) => String(id) === String(award.seasonId));
+      if (!wasClaimed) return res.status(409).json({ error: 'Unable to claim season award' });
+      await SeasonAward.updateOne({ _id: award._id, claimedAt: null }, { $set: { claimedAt: now } });
+      return res.json({ success: true, alreadyClaimed: true, award, coins: wallet.coins, gems: wallet.gems });
+    }
+
+    await SeasonAward.updateOne({ _id: award._id, claimedAt: null }, { $set: { claimedAt: now } });
+    res.json({ success: true, award, coins: updatedUser.coins, gems: updatedUser.gems });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -709,7 +803,7 @@ router.get('/season-rank/:id', auth, async (req, res) => {
 router.get('/profile/:id', auth, async (req, res) => {
   try {
     const targetUser = await User.findById(req.params.id)
-      .select('username bio totalWins totalGames totalCorrect totalWrong xp level isAdmin equippedItems createdAt preferences.showStats')
+      .select('username bio totalWins totalGames totalCorrect totalWrong xp level isAdmin equippedItems createdAt preferences.showStats seasonBadges')
       .populate('equippedItems.avatar')
       .populate('equippedItems.border')
       .populate('equippedItems.cover')
