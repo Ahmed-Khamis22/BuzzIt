@@ -62,7 +62,7 @@ async function seasonLeaderboardEntries(req, { seasonId, userIds, skip, limit })
     { $project: {
       _id: '$user._id', username: '$user.username', totalWins: '$user.totalWins', totalGames: '$user.totalGames',
       totalCorrect: '$user.totalCorrect', totalWrong: '$user.totalWrong', xp: '$points', level: '$user.level',
-      equippedItems: '$user.equippedItems', preferences: '$user.preferences',
+      equippedItems: '$user.equippedItems', preferences: '$user.preferences', seasonBadges: '$user.seasonBadges',
     } },
   ]);
   await User.populate(entries, ['equippedItems.avatar', 'equippedItems.border', 'equippedItems.buzzer']);
@@ -79,7 +79,7 @@ async function legacyLeaderboardEntries(req, { userIds, skip, limit }) {
     .sort({ xp: -1, totalWins: -1 })
     .skip(skip)
     .limit(limit)
-    .select('username totalWins totalGames totalCorrect totalWrong xp level equippedItems preferences')
+    .select('username totalWins totalGames totalCorrect totalWrong xp level equippedItems preferences seasonBadges')
     .populate('equippedItems.avatar')
     .populate('equippedItems.border')
     .populate('equippedItems.buzzer')
