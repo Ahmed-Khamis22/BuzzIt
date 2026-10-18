@@ -216,8 +216,10 @@ function getPublicRooms() {
         ? getPredictMaxPlayers(room.config)
         : room.config?.gameMode === 'codenames'
           ? ([4, 6, 8].includes(Number(room.config?.maxPlayers)) ? Number(room.config.maxPlayers) : 8)
+          : room.config?.gameMode === 'domino'
+            ? ([2, 3, 4].includes(Number(room.config?.playerCount)) ? Number(room.config.playerCount) : 2)
           : 8;
-      const playerCount = ['predict', 'codenames'].includes(room.config?.gameMode)
+      const playerCount = ['predict', 'codenames', 'domino'].includes(room.config?.gameMode)
         ? Object.keys(room.players).length
         : Object.values(room.players).filter((player) => !player.disconnected).length;
       const supportsMidGameJoin = ['buzzer', 'trivia', 'draw'].includes(room.config?.gameMode || 'buzzer');
@@ -1879,21 +1881,24 @@ io.on('connection', (socket) => {
   socket.on('domino_move', ({ roomCode, tileId, playOn, playerIndex } = {}) => {
     const room = rooms[roomCode];
     if (!room || !room.players?.[socket.id] || room.config?.gameMode !== 'domino' || !tileId) return;
-    const verifiedPlayerIndex = room.host === socket.id ? 0 : 1;
+    const player = room.players[socket.id];
+    const verifiedPlayerIndex = Number.isInteger(player.dominoSeat) ? player.dominoSeat : Object.keys(room.players).indexOf(socket.id);
     socket.to(roomCode).emit('domino_move_received', { tileId, playOn, playerIndex: verifiedPlayerIndex });
   });
 
   socket.on('domino_draw', ({ roomCode, playerIndex } = {}) => {
     const room = rooms[roomCode];
     if (!room || !room.players?.[socket.id] || room.config?.gameMode !== 'domino') return;
-    const verifiedPlayerIndex = room.host === socket.id ? 0 : 1;
+    const player = room.players[socket.id];
+    const verifiedPlayerIndex = Number.isInteger(player.dominoSeat) ? player.dominoSeat : Object.keys(room.players).indexOf(socket.id);
     socket.to(roomCode).emit('domino_draw_received', { playerIndex: verifiedPlayerIndex });
   });
 
   socket.on('domino_pass', ({ roomCode, playerIndex } = {}) => {
     const room = rooms[roomCode];
     if (!room || !room.players?.[socket.id] || room.config?.gameMode !== 'domino') return;
-    const verifiedPlayerIndex = room.host === socket.id ? 0 : 1;
+    const player = room.players[socket.id];
+    const verifiedPlayerIndex = Number.isInteger(player.dominoSeat) ? player.dominoSeat : Object.keys(room.players).indexOf(socket.id);
     socket.to(roomCode).emit('domino_pass_received', { playerIndex: verifiedPlayerIndex });
   });
 
@@ -2070,6 +2075,12 @@ io.on('connection', (socket) => {
         timeLimit: [0, 60, 90, 120].includes(normalizedConfig.timeLimit) ? normalizedConfig.timeLimit : 90,
       });
     }
+    if (normalizedConfig.gameMode === 'domino') {
+      normalizedConfig.playerCount = [2, 3, 4].includes(Number(normalizedConfig.playerCount))
+        ? Number(normalizedConfig.playerCount)
+        : 2;
+      normalizedConfig.maxPlayers = normalizedConfig.playerCount;
+    }
     if (normalizedConfig.gameMode === 'predict') {
       normalizedConfig.judgeMode = normalizedConfig.judgeMode === 'ai' ? 'ai' : 'host';
       if (normalizedConfig.judgeMode === 'ai') {
@@ -2107,7 +2118,7 @@ io.on('connection', (socket) => {
       chessMoves: [],
     };
 
-    const isPlayingHost = config?.gameMode === 'codenames' || config?.gameMode === 'predict' || config?.gameMode === 'trivia' || config?.gameMode === 'draw' || config?.gameMode === 'chess' || (config?.gameMode === 'buzzer' && config?.answerMode === 'written');
+    const isPlayingHost = config?.gameMode === 'codenames' || config?.gameMode === 'predict' || config?.gameMode === 'trivia' || config?.gameMode === 'draw' || config?.gameMode === 'chess' || config?.gameMode === 'domino' || (config?.gameMode === 'buzzer' && config?.answerMode === 'written');
     if (isPlayingHost) {
       rooms[code].players[socket.id] = {
         name: hostName || 'Unknown Host',
@@ -2117,6 +2128,7 @@ io.on('connection', (socket) => {
         isAdmin: Boolean(verifiedHostProfile?.isAdmin),
         xp: verifiedHostProfile?.xp || 0,
         level: verifiedHostProfile?.level || 1,
+        ...(config?.gameMode === 'domino' ? { dominoSeat: 0 } : {}),
       };
       rooms[code].scores[socket.id] = 0;
       rooms[code].correct[socket.id] = 0;
@@ -2145,7 +2157,8 @@ io.on('connection', (socket) => {
       xp: p.xp || 0,
       level: p.level || 1,
       team: p.team,
-      cards: rooms[code].cards?.[id] || { yellow: 0, red: 0 }
+      cards: rooms[code].cards?.[id] || { yellow: 0, red: 0 },
+      dominoSeat: p.dominoSeat,
     }));
     socket.emit('joined-room', {
       code,
@@ -2243,10 +2256,12 @@ io.on('connection', (socket) => {
         ? getPredictMaxPlayers(room.config)
         : room.config?.gameMode === 'codenames'
           ? ([4, 6, 8].includes(Number(room.config?.maxPlayers)) ? Number(room.config.maxPlayers) : 8)
+        : room.config?.gameMode === 'domino'
+          ? ([2, 3, 4].includes(Number(room.config?.playerCount)) ? Number(room.config.playerCount) : 2)
         : room.config?.gameMode === 'chess'
           ? 2
           : 8;
-      const occupiedSlots = ['predict', 'codenames'].includes(room.config?.gameMode)
+      const occupiedSlots = ['predict', 'codenames', 'domino'].includes(room.config?.gameMode)
         ? Object.keys(room.players).length
         : activePlayersCount;
       if (occupiedSlots >= roomCapacity) {
@@ -2364,6 +2379,7 @@ io.on('connection', (socket) => {
         isAdmin: Boolean(p.isAdmin),
         xp: p.xp || 0,
         level: p.level || 1,
+        dominoSeat: p.dominoSeat,
         team: room.predictTeams?.[id] || null,
         cards: room.cards?.[id] || { yellow: 0, red: 0 }
       }));
@@ -2381,7 +2397,8 @@ io.on('connection', (socket) => {
         xp: room.players[socket.id].xp || 0,
         level: room.players[socket.id].level || 1,
         team: room.predictTeams?.[socket.id] || null,
-        cards: room.cards?.[socket.id] || { yellow: 0, red: 0 }
+        cards: room.cards?.[socket.id] || { yellow: 0, red: 0 },
+        dominoSeat: room.players[socket.id].dominoSeat,
       });
       if (room.config?.gameMode === 'predict') emitPredictState(code);
       codenames.presence(code);
@@ -2468,6 +2485,9 @@ io.on('connection', (socket) => {
       isAdmin: Boolean(verifiedPlayerProfile?.isAdmin),
       xp: verifiedPlayerProfile?.xp || 0,
       level: verifiedPlayerProfile?.level || 1,
+      ...(room.config?.gameMode === 'domino'
+        ? { dominoSeat: Object.values(room.players).reduce((maxSeat, player) => Number.isInteger(player.dominoSeat) ? Math.max(maxSeat, player.dominoSeat) : maxSeat, -1) + 1 }
+        : {}),
     };
     room.scores[socket.id] = 0;
     room.correct[socket.id] = 0;
@@ -2490,7 +2510,8 @@ io.on('connection', (socket) => {
       xp: p.xp || 0,
       level: p.level || 1,
       team: p.team,
-      cards: room.cards?.[id] || { yellow: 0, red: 0 }
+      cards: room.cards?.[id] || { yellow: 0, red: 0 },
+      dominoSeat: p.dominoSeat,
     }));
 
     socket.emit('joined-room', { code, playerName, players: playersList, status: room.status, config: room.config, hostId: room.host, judge: judgeInfo(room), predictTeams: room.predictTeams, lifelineLoadout: room.lifelineLoadouts?.[socket.id] || [], chatMessages: room.chatMessages || [] });
@@ -2505,6 +2526,7 @@ io.on('connection', (socket) => {
       xp: verifiedPlayerProfile?.xp || 0,
       level: verifiedPlayerProfile?.level || 1,
       cards: { yellow: 0, red: 0 },
+      dominoSeat: room.players[socket.id].dominoSeat,
     });
     io.emit('public-rooms-update', getPublicRooms());
 
