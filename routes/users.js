@@ -49,20 +49,31 @@ function addPresence(req, rawUser) {
 }
 
 async function seasonLeaderboardEntries(req, { seasonId, userIds, skip, limit }) {
-  const scoreMatch = { seasonId };
-  if (userIds) scoreMatch.userId = { $in: userIds };
-  const entries = await SeasonScore.aggregate([
-    { $match: scoreMatch },
-    { $lookup: { from: 'users', localField: 'userId', foreignField: '_id', as: 'user' } },
-    { $unwind: '$user' },
-    { $match: { 'user.isBanned': { $ne: true }, 'user.preferences.showLeaderboard': { $ne: false } } },
-    { $sort: { points: -1, _id: 1 } },
+  const userMatch = { isBanned: { $ne: true }, 'preferences.showLeaderboard': { $ne: false } };
+  if (userIds) userMatch._id = { $in: userIds };
+  const entries = await User.aggregate([
+    { $match: userMatch },
+    { $lookup: {
+      from: SeasonScore.collection.name,
+      let: { userId: '$_id' },
+      pipeline: [
+        { $match: { $expr: { $and: [
+          { $eq: ['$seasonId', seasonId] },
+          { $eq: ['$userId', '$$userId'] },
+        ] } } },
+        { $project: { _id: 0, points: 1 } },
+        { $limit: 1 },
+      ],
+      as: 'seasonScore',
+    } },
+    { $addFields: { seasonPoints: { $ifNull: [{ $arrayElemAt: ['$seasonScore.points', 0] }, 0] } } },
+    { $sort: { seasonPoints: -1, _id: 1 } },
     { $skip: skip },
     { $limit: limit },
     { $project: {
-      _id: '$user._id', username: '$user.username', totalWins: '$user.totalWins', totalGames: '$user.totalGames',
-      totalCorrect: '$user.totalCorrect', totalWrong: '$user.totalWrong', xp: '$points', level: '$user.level',
-      equippedItems: '$user.equippedItems', preferences: '$user.preferences', seasonBadges: '$user.seasonBadges',
+      _id: 1, username: 1, totalWins: 1, totalGames: 1,
+      totalCorrect: 1, totalWrong: 1, xp: '$seasonPoints', level: 1,
+      equippedItems: 1, preferences: 1, seasonBadges: 1,
     } },
   ]);
   await User.populate(entries, ['equippedItems.avatar', 'equippedItems.border', 'equippedItems.buzzer']);
