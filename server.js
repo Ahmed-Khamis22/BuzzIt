@@ -2080,6 +2080,13 @@ io.on('connection', (socket) => {
         ? Number(normalizedConfig.playerCount)
         : 2;
       normalizedConfig.maxPlayers = normalizedConfig.playerCount;
+      normalizedConfig.gameVariant = ['classic', 'five', 'all'].includes(normalizedConfig.gameVariant)
+        ? normalizedConfig.gameVariant
+        : 'classic';
+      normalizedConfig.turnTimeSeconds = [15, 30, 45, 60].includes(Number(normalizedConfig.turnTimeSeconds))
+        ? Number(normalizedConfig.turnTimeSeconds)
+        : 30;
+      normalizedConfig.teamMode = Boolean(normalizedConfig.teamMode) && normalizedConfig.playerCount === 4;
     }
     if (normalizedConfig.gameMode === 'predict') {
       normalizedConfig.judgeMode = normalizedConfig.judgeMode === 'ai' ? 'ai' : 'host';
